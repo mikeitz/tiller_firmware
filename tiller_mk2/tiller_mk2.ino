@@ -53,6 +53,7 @@ void initMatrix() {
   ticksSinceDiff = 0;
   ticksSinceTransmit = repeatTransmitTicks;
   state = 0;
+  memset(debounceTicks, 0, sizeof(debounceTicks));
 }
 
 matrix scanMatrix() {
@@ -67,6 +68,22 @@ matrix scanMatrix() {
   return scan;
 }
 
+bool scanWithDebounce() {
+  matrix scan = scanMatrix(); 
+  bool diff = false;
+  for (int i = 0; i < keys; ++i) {
+    matrix b = ((matrix)1) << i;
+    if (debounceTicks[i] > 0) {
+      debounceTicks[i]--;
+    } else if ((scan & b) != (state & b)) {
+      state = (state & ~b) | (scan & b);
+      debounceTicks[i] = (scan & b) ? debounceDownTicks : debounceUpTicks;
+      diff = true;
+    }
+  }
+  return diff;
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.println("boot"); 
@@ -75,8 +92,9 @@ void setup() {
 }
 
 void loop() {
-  printMatrix(scanMatrix());
-  delay(500);
+  if (scanWithDebounce()) {
+    printMatrix(state);
+  }
 }
 
 void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {}
