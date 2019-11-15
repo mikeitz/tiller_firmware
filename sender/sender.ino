@@ -184,13 +184,13 @@ float readVBAT(void) {
   // ADC range is 0..3000mV and resolution is 12-bit (0..4095)
   return raw * REAL_VBAT_MV_PER_LSB;
 }
- 
+
 uint8_t mvToPercent(float mvolts) {
-  if(mvolts<3300)
+  if (mvolts < 3300)
     return 0;
-  if(mvolts <3600) {
+  if (mvolts < 3600) {
     mvolts -= 3300;
-    return mvolts/30;
+    return mvolts / 30;
   }
   mvolts -= 3600;
   return 10 + (mvolts * 0.15F );  // thats mvolts /6.66666666
@@ -267,7 +267,7 @@ void wake() {
 //////////////////////////////////////////////////// MAIN
 
 void setup() {
-  Serial.begin(115200);
+  // Serial.begin(115200);
   if (Serial) {
     debug("online");
     float vbat_mv = readVBAT();

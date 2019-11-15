@@ -9,13 +9,15 @@ uint8_t matrix[num_rows + 1];
 #define I2C_ADDRESS 2
 
 #define TX_PAYLOAD_LENGTH 5acabddddd
-static uint8_t data_payload[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 static uint8_t ack_payload[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 extern nrf_gzll_error_code_t nrf_gzll_error_code;
 static uint8_t channel_table[6] = {4, 42, 77};
-volatile int new_data_length = 0;
 
 unsigned long lastPacket = 0;
+
+static uint8_t per_pipe_data[8][NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
+static uint32_t per_pipe_length[8];
+bool new_data = false;
 
 #define OFFLINE_TIME 5000
 
@@ -39,7 +41,7 @@ void printMatrix() {
 ///////////////////////////////////////// RADIO
 
 void initRadio() {
-  memset(data_payload, 0, sizeof(data_payload));
+  memset(per_pipe_data, 0, NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH * 8);
 
   nrf_gzll_init(NRF_GZLL_MODE_HOST);
   nrf_gzll_set_channel_table(channel_table, 3);
@@ -61,18 +63,16 @@ void nrf_gzll_disabled() {}
 
 void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
 {
-  uint32_t data_payload_length = NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH;
-  nrf_gzll_fetch_packet_from_rx_fifo(pipe, data_payload, &data_payload_length);
-  if (data_payload_length > 0) {
-    new_data_length = data_payload_length;
-  }
+  per_pipe_length[pipe] = NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH;
+  nrf_gzll_fetch_packet_from_rx_fifo(pipe, per_pipe_data[pipe], &per_pipe_length[pipe]);
+  new_data = true;
   nrf_gzll_flush_rx_fifo(pipe);
   ack_payload[0] =  0x55;
   nrf_gzll_add_packet_to_tx_fifo(pipe, ack_payload, 1);
 }
 
 bool loadMatrixFromPayload() {
-  if (new_data_length == 0) {
+  if (!new_data) {
     if (millis() - lastPacket > OFFLINE_TIME) {
       digitalWrite(LED_BUILTIN, LOW);
     }
@@ -80,7 +80,7 @@ bool loadMatrixFromPayload() {
   } else {
     digitalWrite(LED_BUILTIN, HIGH);
   }
-  if (new_data_length != num_rows + 1 || data_payload[num_rows] != CHECK_BYTE) {
+  if (per_pipe_data[0][num_rows] != CHECK_BYTE) {
     digitalWrite(LED_BUILTIN, LOW);
     delay(100);
     digitalWrite(LED_BUILTIN, HIGH);
@@ -89,12 +89,12 @@ bool loadMatrixFromPayload() {
     delay(100);
     digitalWrite(LED_BUILTIN, HIGH);
     delay(100);
-    new_data_length = 0;
+    new_data = false;
     return false;
   }
-  new_data_length = 0;
+  new_data = false;
   for (int i = 0; i < num_rows; i++) {
-    matrix[i] = data_payload[i];
+    matrix[i] = per_pipe_data[0][i];
   }
   matrix[num_rows] = CHECK_BYTE;
   lastPacket = millis();
@@ -123,6 +123,6 @@ void setup() {
 
 void loop() {
   if (loadMatrixFromPayload()) {
-    // printMatrix();
+    printMatrix();
   }
 }
