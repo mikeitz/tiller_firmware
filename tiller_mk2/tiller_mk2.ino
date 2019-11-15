@@ -24,6 +24,7 @@ int ticksSinceDiff = 0;
 int ticksSinceTransmit = 0;
 uint8_t debounceTicks[keys];
 bool sleeping = false;
+bool waking = true;
 
 ///////////////////////////////////////////////////// MATRIX
 
@@ -84,16 +85,87 @@ bool scanWithDebounce() {
   return diff;
 }
 
+///////////////////////////////////////////////////// CORE
+
+inline void pinModeDetect(uint32_t pin) {
+  pin = g_ADigitalPinMap[pin];
+  NRF_GPIO_Type * port = nrf_gpio_pin_port_decode(&pin);
+  port->PIN_CNF[pin] = ((uint32_t)GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
+                       | ((uint32_t)GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos)
+                       | ((uint32_t)GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos)
+                       | ((uint32_t)GPIO_PIN_CNF_DRIVE_S0S1 << GPIO_PIN_CNF_DRIVE_Pos)
+                       | ((uint32_t)GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
+}
+
+void sleep() {
+  if (sleeping) return;
+  sleeping = true;
+  for (int r = 0; r < num_rows; ++r) {
+    digitalWrite(rows[r], LOW);
+  }
+  NRF_GPIOTE->EVENTS_PORT = 0;
+  NRF_GPIOTE->INTENSET |= GPIOTE_INTENSET_PORT_Msk;
+  for (int c = 0; c < num_cols; ++c) {
+    pinModeDetect(cols[c]);
+  }
+  suspendLoop();
+}
+
+void wake() {
+  if (!sleeping) return;
+  sleeping = false;
+  waking = true;
+  NRF_GPIOTE->EVENTS_PORT = 0;
+  NRF_GPIOTE->INTENCLR |= GPIOTE_INTENSET_PORT_Msk;
+  initMatrix();
+  resumeLoop();
+}
+
+void initCore() {
+  if (!Serial) {
+    NRF_UART0->TASKS_STOPTX = 1;
+    NRF_UART0->TASKS_STOPRX = 1;
+    NRF_UART0->ENABLE = 0;
+    NRF_SPI0->ENABLE = 0;
+  }
+  NVIC_DisableIRQ(GPIOTE_IRQn);
+  NVIC_ClearPendingIRQ(GPIOTE_IRQn);
+  NVIC_SetPriority(GPIOTE_IRQn, 3);
+  NVIC_EnableIRQ(GPIOTE_IRQn);
+  attachCustomInterruptHandler(wake);
+}
+
+void transmit() {
+  printMatrix(state);
+  ticksSinceTransmit = 0;
+}  
+
 void setup() {
   Serial.begin(115200);
-  Serial.println("boot"); 
+  Serial.println("boot");
+  initCore();
   initMatrix();
   nrf_gzll_init(NRF_GZLL_MODE_HOST);
 }
 
 void loop() {
+  if (waking) {
+    waking = false;
+    Serial.println("wake");
+    Serial.flush();
+  }
+  delay(delayPerTick);
+  ticksSinceDiff++;
+  ticksSinceTransmit++;
   if (scanWithDebounce()) {
-    printMatrix(state);
+    transmit();
+    ticksSinceDiff = 0;
+  } else if (ticksSinceDiff > sleepAfterIdleTicks && state == 0) {
+    Serial.println("sleep");
+    Serial.flush();
+    sleep();
+  } else if (ticksSinceTransmit > repeatTransmitTicks) {
+    transmit();
   }
 }
 
