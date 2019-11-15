@@ -19,6 +19,9 @@ static uint8_t per_pipe_data[8][NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 static uint32_t per_pipe_length[8];
 bool new_data = false;
 
+#define halfBit(r, c) (((uint32_t)1) << (c + r * num_cols))
+#define getHalf(half, r, c) (half & halfBit(r, c) ? 1 : 0)
+
 #define OFFLINE_TIME 5000
 
 ///////////////////////////////////////// MATRIX
@@ -71,6 +74,20 @@ void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
   nrf_gzll_add_packet_to_tx_fifo(pipe, ack_payload, 1);
 }
 
+void mergeLeft(uint32_t half) {
+  matrix[0] |= (half >> 0) & 0x3f;
+  matrix[1] |= (half >> 7) & 0x3f;
+  matrix[2] |= (half >> 14) & 0x3f;
+  matrix[3] |= (getHalf(half, 0, 6) << 4) | (getHalf(half, 1, 6) << 5) | (getHalf(half, 2, 6) << 6);
+}
+
+void mergeRight(uint32_t half) {
+  matrix[4] |= (half >> 0) & 0x7e;
+  matrix[5] |= (half >> 7) & 0x7e;
+  matrix[6] |= (half >> 14) & 0x7e;
+  matrix[7] |= (getHalf(half, 0, 0) << 2) | (getHalf(half, 1, 0) << 1) | (getHalf(half, 2, 0) << 0);
+}
+
 bool loadMatrixFromPayload() {
   if (!new_data) {
     if (millis() - lastPacket > OFFLINE_TIME) {
@@ -80,7 +97,8 @@ bool loadMatrixFromPayload() {
   } else {
     digitalWrite(LED_BUILTIN, HIGH);
   }
-  if (per_pipe_data[0][num_rows] != CHECK_BYTE) {
+   
+  /*if (per_pipe_data[0][num_rows] != CHECK_BYTE) {
     digitalWrite(LED_BUILTIN, LOW);
     delay(100);
     digitalWrite(LED_BUILTIN, HIGH);
@@ -91,13 +109,22 @@ bool loadMatrixFromPayload() {
     delay(100);
     new_data = false;
     return false;
-  }
+  }*/
+  
   new_data = false;
   for (int i = 0; i < num_rows; i++) {
     matrix[i] = per_pipe_data[0][i];
   }
   matrix[num_rows] = CHECK_BYTE;
   lastPacket = millis();
+
+  if (per_pipe_length[1] > 0) {
+    mergeLeft(*(uint32_t*)per_pipe_data[1]);
+  }
+  if (per_pipe_length[2] > 0) {
+    mergeRight(*(uint32_t*)per_pipe_data[2]);
+  }
+  
   return true;
 }
 
@@ -123,6 +150,6 @@ void setup() {
 
 void loop() {
   if (loadMatrixFromPayload()) {
-    printMatrix();
+    // jprintMatrix();
   }
 }

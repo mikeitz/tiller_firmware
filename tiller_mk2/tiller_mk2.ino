@@ -1,3 +1,4 @@
+#include "nrf.h"
 #include "nrf_gzll.h"
 
 #define debug if(Serial) { Serial.println(""); }
@@ -13,6 +14,7 @@ const uint8_t rows[num_rows] = {13, 12, 11};
 const uint8_t cols[num_cols] = {PIN_A0, PIN_A1, PIN_A2, PIN_A3, PIN_A4, PIN_A5, PIN_SPI_SCK};
 
 matrix state = 0;
+int pipe = 2;
 
 #define delayPerTick 2
 #define debounceDownTicks 3
@@ -25,6 +27,11 @@ int ticksSinceTransmit = 0;
 uint8_t debounceTicks[keys];
 bool sleeping = false;
 bool waking = true;
+
+uint8_t ack_payload[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
+uint32_t ack_payload_length = 0;
+uint8_t data_buffer[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
+uint8_t channel_table[3] = {4, 42, 77};
 
 ///////////////////////////////////////////////////// MATRIX
 
@@ -85,7 +92,7 @@ bool scanWithDebounce() {
   return diff;
 }
 
-///////////////////////////////////////////////////// CORE
+///////////////////////////////////////////////////// POWER
 
 inline void pinModeDetect(uint32_t pin) {
   pin = g_ADigitalPinMap[pin];
@@ -135,24 +142,50 @@ void initCore() {
   attachCustomInterruptHandler(wake);
 }
 
+///////////////////////////////////////////////////// RADIO
+
+void initRadio() {
+  nrf_gzll_init(NRF_GZLL_MODE_DEVICE);
+  nrf_gzll_set_max_tx_attempts(100);
+  nrf_gzll_set_timeslots_per_channel(4);
+  nrf_gzll_set_channel_table(channel_table, 3);
+  nrf_gzll_set_datarate(NRF_GZLL_DATARATE_1MBIT);
+  nrf_gzll_set_timeslot_period(900);
+  nrf_gzll_set_base_address_0(0x01020304);
+  nrf_gzll_set_base_address_1(0x05060708);
+  nrf_gzll_enable();
+}
+
 void transmit() {
   printMatrix(state);
   ticksSinceTransmit = 0;
-}  
+  nrf_gzll_add_packet_to_tx_fifo(pipe, (uint8_t*)&state, 4);
+}
+
+void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
+  uint32_t ack_payload_length = NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH;
+  if (tx_info.payload_received_in_ack)
+  {
+    nrf_gzll_fetch_packet_from_rx_fifo(pipe, ack_payload, &ack_payload_length);
+  }
+}
+
+void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {}
+void nrf_gzll_disabled() {}
+void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {}
+
+///////////////////////////////////////////////////// MAIN
 
 void setup() {
-  Serial.begin(115200);
-  Serial.println("boot");
+  // Serial.begin(115200);
   initCore();
   initMatrix();
-  nrf_gzll_init(NRF_GZLL_MODE_HOST);
+  initRadio();
 }
 
 void loop() {
   if (waking) {
     waking = false;
-    Serial.println("wake");
-    Serial.flush();
   }
   delay(delayPerTick);
   ticksSinceDiff++;
@@ -161,15 +194,8 @@ void loop() {
     transmit();
     ticksSinceDiff = 0;
   } else if (ticksSinceDiff > sleepAfterIdleTicks && state == 0) {
-    Serial.println("sleep");
-    Serial.flush();
     sleep();
   } else if (ticksSinceTransmit > repeatTransmitTicks) {
     transmit();
   }
 }
-
-void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {}
-void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {}
-void nrf_gzll_disabled() {}
-void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {}
