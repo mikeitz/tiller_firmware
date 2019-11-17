@@ -124,6 +124,13 @@ bool loadMatrixFromPayload() {
   if (per_pipe_length[2] > 0) {
     mergeRight(*(uint32_t*)per_pipe_data[2]);
   }
+
+  if (per_pipe_length[3] > 0) {
+    mergeLeft(*(uint32_t*)per_pipe_data[3]);
+  }
+  if (per_pipe_length[4] > 0) {
+    mergeRight(*(uint32_t*)per_pipe_data[4]);
+  }
   
   return true;
 }

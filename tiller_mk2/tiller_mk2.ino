@@ -1,7 +1,7 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
 
-#define debug if(Serial) { Serial.println(""); }
+#define debug 0
 
 #define num_rows 3
 #define num_cols 7
@@ -11,7 +11,9 @@
 #define set(s, r, c, v) (s |= v ? bit(r, c) : 0)
 #define get(s, r, c) (s & bit(r, c) ? 1 : 0)
 const uint8_t rows[num_rows] = {13, 12, 11};
-const uint8_t cols[num_cols] = {PIN_A0, PIN_A1, PIN_A2, PIN_A3, PIN_A4, PIN_A5, PIN_SPI_SCK};
+const uint8_t cols_slim[num_cols] = {PIN_A0, PIN_A1, PIN_A2, PIN_A3, PIN_A4, PIN_A5, PIN_SPI_SCK};
+const uint8_t cols_thick[num_cols] = {PIN_SPI_SCK, PIN_A5, PIN_A4, PIN_A3, PIN_A2, PIN_A1, PIN_A0};
+const uint8_t* cols = nullptr;
 
 matrix state = 0;
 int pipe = 2;
@@ -51,6 +53,11 @@ void printMatrix(matrix state) {
 }
 
 void initMatrix() {
+  if (pipe == 3 || pipe == 4) {
+    cols = cols_thick;
+  } else {
+    cols = cols_slim;
+  }
   for (int r = 0; r < num_rows; ++r) {
     pinMode(rows[r], OUTPUT);
     digitalWrite(rows[r], HIGH);
@@ -124,17 +131,21 @@ void wake() {
   waking = true;
   NRF_GPIOTE->EVENTS_PORT = 0;
   NRF_GPIOTE->INTENCLR |= GPIOTE_INTENSET_PORT_Msk;
+  if (Serial && !debug) {
+    Serial.end();
+  }
   initMatrix();
   resumeLoop();
 }
 
+void killSerial() {
+  NRF_UART0->TASKS_STOPTX = 1;
+  NRF_UART0->TASKS_STOPRX = 1;
+  NRF_UART0->ENABLE = 0;
+  NRF_SPI0->ENABLE = 0;
+}
+
 void initCore() {
-  if (!Serial) {
-    NRF_UART0->TASKS_STOPTX = 1;
-    NRF_UART0->TASKS_STOPRX = 1;
-    NRF_UART0->ENABLE = 0;
-    NRF_SPI0->ENABLE = 0;
-  }
   NVIC_DisableIRQ(GPIOTE_IRQn);
   NVIC_ClearPendingIRQ(GPIOTE_IRQn);
   NVIC_SetPriority(GPIOTE_IRQn, 3);
@@ -157,7 +168,7 @@ void initRadio() {
 }
 
 void transmit() {
-  printMatrix(state);
+  // printMatrix(state);
   ticksSinceTransmit = 0;
   nrf_gzll_add_packet_to_tx_fifo(pipe, (uint8_t*)&state, 4);
 }
@@ -177,7 +188,9 @@ void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
 ///////////////////////////////////////////////////// MAIN
 
 void setup() {
-  // Serial.begin(115200);
+  if (debug) {
+    Serial.begin(115200);
+  }
   initCore();
   initMatrix();
   initRadio();
