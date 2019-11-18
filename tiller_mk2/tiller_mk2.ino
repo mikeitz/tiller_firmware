@@ -2,7 +2,6 @@
 #include "nrf_gzll.h"
 
 #define debug 0
-
 #define num_rows 3
 #define num_cols 7
 #define keys (num_rows * num_cols)
@@ -16,7 +15,7 @@ const uint8_t cols_thick[num_cols] = {PIN_SPI_SCK, PIN_A5, PIN_A4, PIN_A3, PIN_A
 const uint8_t* cols = nullptr;
 
 matrix state = 0;
-int pipe = 2;
+int pipe = 3;
 
 #define delayPerTick 2
 #define debounceDownTicks 3
@@ -168,7 +167,9 @@ void initRadio() {
 }
 
 void transmit() {
-  // printMatrix(state);
+  if (debug) {
+    printMatrix(state);
+  }
   ticksSinceTransmit = 0;
   nrf_gzll_add_packet_to_tx_fifo(pipe, (uint8_t*)&state, 4);
 }
