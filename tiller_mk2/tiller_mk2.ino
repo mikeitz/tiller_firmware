@@ -19,9 +19,9 @@ int pipe = 3;
 
 #define delayPerTick 2
 #define debounceDownTicks 3
-#define debounceUpTicks 6
-#define sleepAfterIdleTicks (1000/delayPerTick)
-#define repeatTransmitTicks (500/delayPerTick)
+#define debounceUpTicks 5
+#define sleepAfterIdleTicks (200/delayPerTick)
+#define repeatTransmitTicks (100/delayPerTick)
 
 int ticksSinceDiff = 0;
 int ticksSinceTransmit = 0;
@@ -163,6 +163,7 @@ void initRadio() {
   nrf_gzll_set_timeslot_period(900);
   nrf_gzll_set_base_address_0(0x01020304);
   nrf_gzll_set_base_address_1(0x05060708);
+  nrf_gzll_set_tx_power(NRF_GZLL_TX_POWER_4_DBM);
   nrf_gzll_enable();
 }
 

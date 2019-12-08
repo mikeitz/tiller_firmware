@@ -1,7 +1,5 @@
 #include "MIDIUSB.h"
 
-// 3000 is 127
-// 50000 is 1
 #define VMIN 3000
 #define VMAX 50000
 
@@ -15,19 +13,6 @@ void show(uint8_t b) {
     Serial.print((int)(b >> i) & 1);
   }
 }
-
-/*void noteOn(uint8_t note, uint8_t vel) {
-  // Serial.println(vel);
-  note += 38;
-  MidiUSB.sendMIDI({0x09, 0x90, note, vel});
-  MidiUSB.flush();
-}
-
-void noteOff(uint8_t note, uint8_t vel) {
-  note += 38;
-  MidiUSB.sendMIDI({0x08, 0x80, note, vel});
-  MidiUSB.flush();
-}*/
 
 uint8_t note(uint8_t i, uint8_t j) {
   return j * 8 + i + 32;
