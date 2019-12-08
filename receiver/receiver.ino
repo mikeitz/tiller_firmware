@@ -8,21 +8,25 @@ uint8_t matrix[num_rows + 1];
 
 #define I2C_ADDRESS 2
 
-#define TX_PAYLOAD_LENGTH 5acabddddd
 static uint8_t ack_payload[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 extern nrf_gzll_error_code_t nrf_gzll_error_code;
-static uint8_t channel_table[6] = {4, 42, 77};
+static uint8_t channel_table[6] = {4, 25, 42, 63, 77, 33};
 
 unsigned long lastPacket = 0;
 
 static uint8_t per_pipe_data[8][NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 static uint32_t per_pipe_length[8];
+static uint32_t per_pipe_order[8];
 bool new_data = false;
 
 #define halfBit(r, c) (((uint32_t)1) << (c + r * num_cols))
 #define getHalf(half, r, c) (half & halfBit(r, c) ? 1 : 0)
+#define packet_t_size 4
+struct packet_t {
+  uint32_t state = 0;
+};
 
-#define OFFLINE_TIME 5000
+#define OFFLINE_TIME 1000
 
 ///////////////////////////////////////// MATRIX
 
@@ -56,7 +60,7 @@ void initRadio() {
 
   ack_payload[0] = 0x55;
   nrf_gzll_add_packet_to_tx_fifo(0, ack_payload, 1);
-
+  nrf_gzll_set_tx_power(NRF_GZLL_TX_POWER_4_DBM);
   nrf_gzll_enable();
 }
 
@@ -74,14 +78,16 @@ void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
   nrf_gzll_add_packet_to_tx_fifo(pipe, ack_payload, 1);
 }
 
-void mergeLeft(uint32_t half) {
+void mergeLeft(packet_t packet, int pipe) {
+  uint32_t half = packet.state;
   matrix[0] |= (half >> 0) & 0x3f;
   matrix[1] |= (half >> 7) & 0x3f;
   matrix[2] |= (half >> 14) & 0x3f;
   matrix[3] |= (getHalf(half, 0, 6) << 4) | (getHalf(half, 1, 6) << 5) | (getHalf(half, 2, 6) << 6);
 }
 
-void mergeRight(uint32_t half) {
+void mergeRight(packet_t packet, int pipe) {
+  uint32_t half = packet.state;
   matrix[4] |= (half >> 0) & 0x7e;
   matrix[5] |= (half >> 7) & 0x7e;
   matrix[6] |= (half >> 14) & 0x7e;
@@ -92,24 +98,13 @@ bool loadMatrixFromPayload() {
   if (!new_data) {
     if (millis() - lastPacket > OFFLINE_TIME) {
       digitalWrite(LED_BUILTIN, LOW);
+      memset(per_pipe_length, 0, 8 * 4);
+      memset(per_pipe_order, 0, 8 * 4);
     }
     return false;
   } else {
     digitalWrite(LED_BUILTIN, HIGH);
   }
-   
-  /*if (per_pipe_data[0][num_rows] != CHECK_BYTE) {
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(100);
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(100);
-    digitalWrite(LED_BUILTIN, LOW);
-    delay(100);
-    digitalWrite(LED_BUILTIN, HIGH);
-    delay(100);
-    new_data = false;
-    return false;
-  }*/
   
   new_data = false;
   for (int i = 0; i < num_rows; i++) {
@@ -119,17 +114,16 @@ bool loadMatrixFromPayload() {
   lastPacket = millis();
 
   if (per_pipe_length[1] > 0) {
-    mergeLeft(*(uint32_t*)per_pipe_data[1]);
+    mergeLeft(*(packet_t*)(per_pipe_data[1]), 1);
   }
   if (per_pipe_length[2] > 0) {
-    mergeRight(*(uint32_t*)per_pipe_data[2]);
+    mergeRight(*(packet_t*)(per_pipe_data[2]), 2);
   }
-
   if (per_pipe_length[3] > 0) {
-    mergeLeft(*(uint32_t*)per_pipe_data[3]);
+    mergeLeft(*(packet_t*)(per_pipe_data[3]), 3);
   }
   if (per_pipe_length[4] > 0) {
-    mergeRight(*(uint32_t*)per_pipe_data[4]);
+    mergeRight(*(packet_t*)(per_pipe_data[4]), 4);
   }
   
   return true;
@@ -153,10 +147,14 @@ void setup() {
   Serial.begin(115200);
   initRadio();
   initWire();
+  Serial.print("ok");
+
+  memset(per_pipe_length, 0, 8 * 4);
+  memset(per_pipe_order, 0, 8 * 4);
 }
 
 void loop() {
   if (loadMatrixFromPayload()) {
-    // jprintMatrix();
+    //printMatrix();
   }
 }
