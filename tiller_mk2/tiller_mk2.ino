@@ -1,7 +1,9 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
 
+const uint8_t pipe = 3;
 #define debug 0
+
 #define num_rows 3
 #define num_cols 7
 #define keys (num_rows * num_cols)
@@ -21,16 +23,16 @@ struct packet_t {
 };
 packet_t packet;
 
-int pipe = 3;
-
 #define delayPerTick 2
-#define debounceUpTicks 5
+#define numDebounceUpTicks (20/delayPerTick)
+#define numDebounceRepeatTicks (60/delayPerTick)
 #define sleepAfterIdleTicks (200/delayPerTick)
 #define repeatTransmitTicks (100/delayPerTick)
 
 int ticksSinceDiff = 0;
 int ticksSinceTransmit = 0;
-uint8_t debounceTicks[keys];
+uint8_t debounceUpTicks[keys];
+uint8_t debounceRepeatTicks[keys];
 bool sleeping = false;
 bool waking = true;
 
@@ -71,7 +73,8 @@ void initMatrix() {
   ticksSinceDiff = 0;
   ticksSinceTransmit = repeatTransmitTicks;
   packet.state = 0;
-  memset(debounceTicks, 0, sizeof(debounceTicks));
+  memset(debounceUpTicks, 0, sizeof(debounceUpTicks));
+  memset(debounceRepeatTicks, 0, sizeof(debounceRepeatTicks));
 }
 
 matrix_t scanMatrix() {
@@ -92,16 +95,26 @@ bool scanWithDebounce() {
   for (int i = 0; i < keys; ++i) {
     matrix_t b = ((matrix_t)1) << i;
 
+    bool debouncingRepeat = false;
+    if (debouncingRepeat = debounceRepeatTicks[i] > 0) {
+      debounceRepeatTicks[i]--;
+    }
+
     if (scan & b) {
-      diff |= !(packet.state & b);
-      packet.state |= b;
-      debounceTicks[i] = debounceUpTicks;
+      if (debouncingRepeat) {
+        // nothing?
+      } else {
+        diff |= !(packet.state & b);
+        packet.state |= b;
+        debounceUpTicks[i] = numDebounceUpTicks;
+      }
     } else if (packet.state & b) {
-      if (debounceTicks[i] > 0) {
-        debounceTicks[i]--;
+      if (debounceUpTicks[i] > 0) {
+        debounceUpTicks[i]--;
       } else {
         packet.state &= ~b;
         diff = true;
+        debounceRepeatTicks[i] = numDebounceRepeatTicks;
       }
     }
   }
