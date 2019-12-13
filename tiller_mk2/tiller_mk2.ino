@@ -1,7 +1,7 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
 
-const uint8_t pipe = 3;
+const uint8_t pipe = 4;
 #define debug 0
 
 #define num_rows 3
@@ -22,17 +22,16 @@ struct packet_t {
   matrix_t state = 0;
 };
 packet_t packet;
+matrix_t lastScan;
 
-#define delayPerTick 2
-#define numDebounceUpTicks (20/delayPerTick)
-#define numDebounceRepeatTicks (60/delayPerTick)
-#define sleepAfterIdleTicks (200/delayPerTick)
-#define repeatTransmitTicks (100/delayPerTick)
+#define delayPerTick 1
+#define numDebounce 6
+#define sleepAfterIdleTicks (1500/delayPerTick)
+#define repeatTransmitTicks (400/delayPerTick)
 
 int ticksSinceDiff = 0;
 int ticksSinceTransmit = 0;
-uint8_t debounceUpTicks[keys];
-uint8_t debounceRepeatTicks[keys];
+int debounceCount = 0;
 bool sleeping = false;
 bool waking = true;
 
@@ -44,17 +43,17 @@ uint8_t channel_table_left[3] = {4, 42, 77};
 uint8_t channel_table_right[3] = {25, 63, 33};
 uint8_t *channel_table;
 
+matrix_t printed;
+
 ///////////////////////////////////////////////////// MATRIX
 
 void printMatrix(matrix_t state) {
-  Serial.println("");
   for (uint8_t r = 0; r < num_rows; r++) {
     for (uint8_t c = 0; c < num_cols; c++) {
       Serial.print(get(state, r, c));
     }
-    Serial.println("");
+    Serial.print(" ");
   }
-  Serial.println("");
 }
 
 void initMatrix() {
@@ -73,8 +72,8 @@ void initMatrix() {
   ticksSinceDiff = 0;
   ticksSinceTransmit = repeatTransmitTicks;
   packet.state = 0;
-  memset(debounceUpTicks, 0, sizeof(debounceUpTicks));
-  memset(debounceRepeatTicks, 0, sizeof(debounceRepeatTicks));
+  lastScan = 0;
+  debounceCount = 0;
 }
 
 matrix_t scanMatrix() {
@@ -91,34 +90,21 @@ matrix_t scanMatrix() {
 
 bool scanWithDebounce() {
   matrix_t scan = scanMatrix(); 
-  bool diff = false;
-  for (int i = 0; i < keys; ++i) {
-    matrix_t b = ((matrix_t)1) << i;
-
-    bool debouncingRepeat = false;
-    if (debouncingRepeat = debounceRepeatTicks[i] > 0) {
-      debounceRepeatTicks[i]--;
+  if (scan == lastScan) {
+    if (debounceCount > numDebounce) {
+      bool diff = (packet.state != scan); 
+      packet.state = scan;
+      debounceCount = 0;
+      return diff;
+    } else {
+      debounceCount++;
+      return false;
     }
-
-    if (scan & b) {
-      if (debouncingRepeat) {
-        // nothing?
-      } else {
-        diff |= !(packet.state & b);
-        packet.state |= b;
-        debounceUpTicks[i] = numDebounceUpTicks;
-      }
-    } else if (packet.state & b) {
-      if (debounceUpTicks[i] > 0) {
-        debounceUpTicks[i]--;
-      } else {
-        packet.state &= ~b;
-        diff = true;
-        debounceRepeatTicks[i] = numDebounceRepeatTicks;
-      }
-    }
+  } else {
+    lastScan = scan;
+    debounceCount = 0;
+    return false;
   }
-  return diff;
 }
 
 ///////////////////////////////////////////////////// POWER
@@ -196,17 +182,20 @@ void initRadio() {
 }
 
 void transmit() {
-  if (debug) {
-    printMatrix(packet.state);
-  }
   ticksSinceTransmit = 0;
   nrf_gzll_add_packet_to_tx_fifo(pipe, (uint8_t*)&packet, packet_t_size);
+  if (debug && printed != packet.state) {
+    Serial.println("");
+    printMatrix(packet.state);
+    printed = packet.state;
+  } else if (debug) {
+    Serial.println(".");
+  }
 }
 
 void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
   uint32_t ack_payload_length = NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH;
-  if (tx_info.payload_received_in_ack)
-  {
+  if (tx_info.payload_received_in_ack) {
     nrf_gzll_fetch_packet_from_rx_fifo(pipe, ack_payload, &ack_payload_length);
   }
 }
@@ -230,9 +219,6 @@ void loop() {
   if (waking) {
     waking = false;
   }
-  delay(delayPerTick);
-  ticksSinceDiff++;
-  ticksSinceTransmit++;
   if (scanWithDebounce()) {
     transmit();
     ticksSinceDiff = 0;
@@ -241,4 +227,7 @@ void loop() {
   } else if (ticksSinceTransmit > repeatTransmitTicks) {
     transmit();
   }
+  ticksSinceDiff++;
+  ticksSinceTransmit++;
+  delay(delayPerTick);
 }
