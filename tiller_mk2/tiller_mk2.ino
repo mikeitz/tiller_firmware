@@ -105,7 +105,7 @@ bool scanWithDebounce() {
 
 inline void pinModeDetect(uint32_t pin) {
   pin = g_ADigitalPinMap[pin];
-  NRF_GPIO_Type * port = nrf_gpio_pin_port_decode(&pin);
+  NRF_GPIO_Type *port = nrf_gpio_pin_port_decode(&pin);
   port->PIN_CNF[pin] = ((uint32_t)GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
                        | ((uint32_t)GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos)
                        | ((uint32_t)GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos)
@@ -133,12 +133,10 @@ void sleep() {
 }
 
 void wake() {
-  if (!sleeping) return;
   sleeping = false;
   waking = true;
   NRF_GPIOTE->EVENTS_PORT = 0;
   NRF_GPIOTE->INTENCLR |= GPIOTE_INTENSET_PORT_Msk;
-  initMatrix();
   resumeLoop();
 }
 
@@ -166,7 +164,6 @@ void initRadio() {
 }
 
 void transmit() {
-  ticksSinceTransmit = 0;
   nrf_gzll_add_packet_to_tx_fifo(PIPE, (uint8_t*)&packet, packet_t_size);
   #if DEBUG
     if (printed != packet.state) {
@@ -197,23 +194,31 @@ void setup() {
     Serial.begin(115200);
   #endif
   initCore();
-  initMatrix();
   initRadio();
 }
 
 void loop() {
+  if (sleeping) {
+    delay(1);
+    return;
+  }
   if (waking) {
     waking = false;
+    initMatrix();
   }
   if (scanWithDebounce()) {
     transmit();
-    ticksSinceDiff = 0;
+    ticksSinceTransmit = ticksSinceDiff = 0;
   } else if (ticksSinceDiff > sleepAfterIdleTicks && packet.state == 0) {
     sleep();
+    return;
   } else if (ticksSinceTransmit > repeatTransmitTicks) {
     transmit();
+    ticksSinceDiff++;
+    ticksSinceTransmit = 0;
+  } else {
+    ticksSinceDiff++;
+    ticksSinceTransmit++;
   }
-  ticksSinceDiff++;
-  ticksSinceTransmit++;
   delay(delayPerTick);
 }
