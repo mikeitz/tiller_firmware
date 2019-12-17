@@ -1,44 +1,51 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
 
-#define debug 0
+const uint8_t debug = 0;
+const uint8_t pipe = 3;
 
-#define num_rows 3
-#define num_cols 7
-#define keys (num_rows * num_cols)
-#define matrix uint32_t
-#define bit(r, c) (((matrix)1) << (c + r * num_cols))
-#define set(s, r, c, v) (s |= v ? bit(r, c) : 0)
-#define get(s, r, c) (s & bit(r, c) ? 1 : 0)
+const uint8_t num_rows = 3;
+const uint8_t num_cols = 7;
+const uint8_t keys = num_rows * num_cols;
+
 const uint8_t rows[num_rows] = {13, 12, 11};
 const uint8_t cols_slim[num_cols] = {PIN_A0, PIN_A1, PIN_A2, PIN_A3, PIN_A4, PIN_A5, PIN_SPI_SCK};
 const uint8_t cols_thick[num_cols] = {PIN_SPI_SCK, PIN_A5, PIN_A4, PIN_A3, PIN_A2, PIN_A1, PIN_A0};
 const uint8_t* cols = nullptr;
 
-matrix state = 0;
-int pipe = 3;
+const uint8_t delayPerTick = 2;
+const uint8_t debounceDownTicks = 3;
+const uint8_t debounceUpTicks = 3;
+const uint16_t sleepAfterIdleTicks = 1000/delayPerTick;
+const uint16_t repeatTransmitTicks = 500/delayPerTick;
 
-#define delayPerTick 2
-#define debounceDownTicks 3
-#define debounceUpTicks 3
-#define sleepAfterIdleTicks (1000/delayPerTick)
-#define repeatTransmitTicks (500/delayPerTick)
-
-int ticksSinceDiff = 0;
-int ticksSinceTransmit = 0;
+typedef uint32_t matrix_t;
+matrix_t state = 0;
+uint16_t ticksSinceDiff = 0;
+uint16_t ticksSinceTransmit = 0;
 uint8_t debounceTicks[keys];
-bool sleeping = false;
-bool waking = true;
+volatile bool sleeping = false;
+volatile bool waking = true;
 
+uint8_t channel_table[3] = {4, 42, 77};
 uint8_t ack_payload[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 uint32_t ack_payload_length = 0;
-uint8_t data_buffer[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
-uint8_t channel_table[3] = {4, 42, 77};
 
 ///////////////////////////////////////////////////// MATRIX
 
+inline matrix_t rc(uint8_t r, uint8_t c) {
+  return ((matrix_t)1) << (c + r * num_cols);
+}
 
-void printMatrix(matrix state) {
+inline void set(matrix_t *s, uint8_t r, uint8_t c, bool v) {
+  *s |= v ? rc(r, c) : 0;
+}
+
+inline bool get(matrix_t s, uint8_t r, uint8_t c) {
+  return s & rc(r, c) ? 1 : 0;
+}
+
+void printMatrix(matrix_t state) {
   if (!Serial) {
     return;
   }
@@ -71,12 +78,12 @@ void initMatrix() {
   memset(debounceTicks, 0, sizeof(debounceTicks));
 }
 
-matrix scanMatrix() {
-  matrix scan = 0;
+matrix_t scanMatrix() {
+  matrix_t scan = 0;
   for (int r = 0; r < num_rows; ++r) {
     digitalWrite(rows[r], LOW);
     for (int c = 0; c < num_cols; ++c) {
-      set(scan, r, c, !digitalRead(cols[c]));
+      set(&scan, r, c, !digitalRead(cols[c]));
     }
     digitalWrite(rows[r], HIGH);
   }
@@ -84,10 +91,10 @@ matrix scanMatrix() {
 }
 
 bool scanWithDebounce() {
-  matrix scan = scanMatrix(); 
+  matrix_t scan = scanMatrix(); 
   bool diff = false;
   for (int i = 0; i < keys; ++i) {
-    matrix b = ((matrix)1) << i;
+    matrix_t b = ((matrix_t)1) << i;
     if (debounceTicks[i] > 0) {
       debounceTicks[i]--;
     } else if ((scan & b) != (state & b)) {
@@ -175,8 +182,7 @@ void transmit() {
 
 void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
   uint32_t ack_payload_length = NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH;
-  if (tx_info.payload_received_in_ack)
-  {
+  if (tx_info.payload_received_in_ack) {
     nrf_gzll_fetch_packet_from_rx_fifo(pipe, ack_payload, &ack_payload_length);
   }
 }
