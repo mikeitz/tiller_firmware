@@ -2,7 +2,7 @@
 #include "nrf_gzll.h"
 
 const uint8_t debug = 0;
-const uint8_t pipe = 3;
+const uint8_t pipe = 4;
 
 const uint8_t num_rows = 3;
 const uint8_t num_cols = 7;
