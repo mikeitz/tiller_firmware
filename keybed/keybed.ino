@@ -1,4 +1,44 @@
 #include "nrf.h"
+#include "nrf_gzll.h"
+
+/////// RADIO
+
+const uint8_t PIPE = 7;
+const bool DEBUG = 0;
+
+uint8_t ack_payload[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
+uint32_t ack_payload_length = 0;
+uint8_t channel_table[3] = {4, 42, 77};
+
+void initRadio() {
+  nrf_gzll_init(NRF_GZLL_MODE_DEVICE);
+  nrf_gzll_set_max_tx_attempts(100);
+  nrf_gzll_set_timeslots_per_channel(4);
+  nrf_gzll_set_channel_table(channel_table, 3);
+  nrf_gzll_set_datarate(NRF_GZLL_DATARATE_1MBIT);
+  nrf_gzll_set_timeslot_period(900);
+  nrf_gzll_set_base_address_0(0x01020304);
+  nrf_gzll_set_base_address_1(0x05060708);
+  nrf_gzll_set_tx_power(NRF_GZLL_TX_POWER_4_DBM);
+  nrf_gzll_enable();
+}
+
+inline void transmit(uint16_t data) {
+  nrf_gzll_add_packet_to_tx_fifo(PIPE, (uint8_t*)&data, 2);
+  if (DEBUG) {
+    Serial.println(data, HEX);
+  }
+}
+
+void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
+  uint32_t ack_payload_length = NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH;
+  if (tx_info.payload_received_in_ack) {
+    nrf_gzll_fetch_packet_from_rx_fifo(pipe, ack_payload, &ack_payload_length);
+  }
+}
+void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {}
+void nrf_gzll_disabled() {}
+void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {}
 
 /////// MATRIX
 
@@ -15,43 +55,31 @@ void initMatrix() {
   memset(time2, 0, 64 * 4);
 }
 
-void show(uint8_t b) {
-  for (int i = 0; i < 8; ++i) {
-    Serial.print((int)(b >> i) & 1);
-  }
-}
-
-uint8_t note(uint8_t i, uint8_t j) {
+inline uint8_t note(uint8_t i, uint8_t j) {
   return j * 8 + i + 32;
 }
 
-uint8_t vel(long t) {
+inline uint8_t vel(long t) {
   t = (t - VMIN) * 127 / VMAX;
   t = 127 - t;
   return min(127, max(1, t));
 }
 
-void noteOn(uint8_t i, uint8_t j, unsigned long t) {
-  uint8_t n = note(i, j);
-  uint8_t v = vel(t);
-  Serial.print("ON ");
-  Serial.print(n);
-  Serial.print(" ");
-  Serial.println(vel(t));
-  Serial.flush();
+inline void noteOn(uint8_t i, uint8_t j, unsigned long t) {
+  uint16_t data = 0x80 | note(i, j);
+  data <<= 8;
+  data |= 0x80 | vel(t);
+  transmit(data);
 }
 
-void noteOff(uint8_t i, uint8_t j, unsigned long t) {
-  uint8_t n = note(i, j);
-  uint8_t v = vel(t);
-  Serial.print("OFF ");
-  Serial.print(n);
-  Serial.print(" ");
-  Serial.println(vel(t));
-  Serial.flush();
+inline void noteOff(uint8_t i, uint8_t j, unsigned long t) {
+  uint16_t data = 0x80 | note(i, j);
+  data <<= 8;
+  data |= 0x00 | vel(t);
+  transmit(data);
 }
 
-void updateScan(unsigned long t, uint8_t i, uint8_t scan1, uint8_t scan2) {
+inline void updateScan(unsigned long t, uint8_t i, uint8_t scan1, uint8_t scan2) {
   if (scan1 != last1[i]) {
     for (uint8_t j = 0; j < 7; ++j) {
       uint8_t b = 1 << j;
@@ -106,7 +134,11 @@ void nfcAsGpio() {
 
 void setup() {
   nfcAsGpio();
-  Serial.begin(115200);
+  if (DEBUG) {
+    Serial.begin(115200);
+  } else {
+    Serial.end();
+  }
   for (int i = 9; i <= 23; ++i) {
     if (i == 21) continue;
     pinMode(i, INPUT_PULLUP);
@@ -119,6 +151,7 @@ void setup() {
   pinMode(7, OUTPUT);
   digitalWrite(7, HIGH);
   initMatrix();
+  initRadio();
 }
 
 inline uint8_t scanUpper(uint32_t s) {
