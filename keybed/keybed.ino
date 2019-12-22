@@ -1,10 +1,14 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
 
+uint8_t keybed[49];
+bool changed = false;
+volatile bool request_resync = false;
+
 /////// RADIO
 
 const uint8_t PIPE = 7;
-const bool DEBUG = 0;
+const bool DEBUG = 1;
 
 uint8_t ack_payload[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 uint32_t ack_payload_length = 0;
@@ -23,20 +27,16 @@ void initRadio() {
   nrf_gzll_enable();
 }
 
-inline void transmit(uint16_t data) {
-  nrf_gzll_add_packet_to_tx_fifo(PIPE, (uint8_t*)&data, 2);
-  if (DEBUG) {
-    Serial.println(data, HEX);
-  }
-}
-
 void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
   uint32_t ack_payload_length = NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH;
   if (tx_info.payload_received_in_ack) {
     nrf_gzll_fetch_packet_from_rx_fifo(pipe, ack_payload, &ack_payload_length);
   }
 }
-void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {}
+void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
+  if (DEBUG) Serial.println("X");
+  request_resync = true;
+}
 void nrf_gzll_disabled() {}
 void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {}
 
@@ -53,6 +53,7 @@ void initMatrix() {
   memset(last2, 255, 8);
   memset(time1, 0, 64 * 4);
   memset(time2, 0, 64 * 4);
+  memset(keybed, 0, 49);
 }
 
 inline uint8_t note(uint8_t i, uint8_t j) {
@@ -66,17 +67,27 @@ inline uint8_t vel(long t) {
 }
 
 inline void noteOn(uint8_t i, uint8_t j, unsigned long t) {
-  uint16_t data = 0x80 | note(i, j);
-  data <<= 8;
-  data |= 0x80 | vel(t);
-  transmit(data);
+  transmit(note(i, j), vel(t) | 0x80);
 }
 
 inline void noteOff(uint8_t i, uint8_t j, unsigned long t) {
-  uint16_t data = 0x80 | note(i, j);
-  data <<= 8;
-  data |= 0x00 | vel(t);
-  transmit(data);
+  transmit(note(i, j), vel(t));
+}
+
+inline void transmit(uint8_t n, uint8_t v) {
+  keybed[n - 36] = v;
+  request_resync = true;
+  if (request_resync) {
+    // Don't send more individual notes until resync succeeds.
+    return;
+  }
+  uint16_t data = (n << 8) | v;
+  nrf_gzll_add_packet_to_tx_fifo(PIPE, (uint8_t*)&data, 2);
+}
+
+inline void resync() {
+  nrf_gzll_add_packet_to_tx_fifo(PIPE, keybed, 32);
+  nrf_gzll_add_packet_to_tx_fifo(PIPE, keybed + 32, 49 - 32);
 }
 
 inline void updateScan(unsigned long t, uint8_t i, uint8_t scan1, uint8_t scan2) {
@@ -136,6 +147,7 @@ void setup() {
   nfcAsGpio();
   if (DEBUG) {
     Serial.begin(115200);
+    Serial.println("online");
   } else {
     Serial.end();
   }
@@ -145,13 +157,13 @@ void setup() {
   }
   for (int i = 0; i <= 8; ++i) {
     pinMode(rows[i], OUTPUT);
-    digitalWrite(rows[i], HIGH);
     rowMask |= (rowScan[i] = (1UL << rows[i]));
   }
-  pinMode(7, OUTPUT);
-  digitalWrite(7, HIGH);
   initMatrix();
   initRadio();
+  // Turn off LED
+  pinMode(7, OUTPUT);
+  digitalWrite(7, HIGH);
 }
 
 inline uint8_t scanUpper(uint32_t s) {
@@ -165,11 +177,17 @@ inline uint8_t scanLower(uint32_t s) {
 }
 
 void loop() {
+  NRF_GPIO->OUTSET = rowMask;
   for(uint8_t i = 0; i < 8; ++i) {
-    NRF_GPIO->OUTSET = rowMask;
     NRF_GPIO->OUTCLR = rowScan[i];
     unsigned long t = micros();
     uint32_t scan = NRF_GPIO->IN;
     updateScan(t, i, scanUpper(scan), scanLower(scan));
+    NRF_GPIO->OUTSET = rowMask;
   }
+  if (request_resync) {
+    request_resync = false;
+    resync();
+  }
+  delay(1);
 }
