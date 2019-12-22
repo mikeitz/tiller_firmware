@@ -35,7 +35,7 @@ struct half_packet_t {
 
 #define OFFLINE_TIME 2000
 
-uint8_t keybed[49];
+// uint8_t keybed[49];
 
 const uint16_t buffer_size = 1024;
 volatile uint16_t midi_keys[buffer_size];
@@ -64,13 +64,14 @@ void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info)
 void nrf_gzll_disabled() {}
 
 inline void handle_midi_packet(uint8_t* data, uint8_t len) {
-  if (len == 2) {
-    uint16_t msg = *(uint16_t*)data;
-    uint8_t n = (msg >> 8) & 0x7f;
-    keybed[n - 36] = msg & 0xff;
+  for (int i = 0; i < len; i += 2) {
+    uint16_t msg = *(uint16_t*)&data[i];
+    //uint8_t n = (msg >> 8) & 0x7f;
+    //keybed[n - 36] = msg & 0xff;
     midi_keys[index_written % buffer_size] = msg | 0x8000;
     index_written++;
-  } else if (len == 32 || len == (49 - 32)){
+  }
+  /*else if (len == 32 || len == (49 - 32)){
     for (uint8_t i = 0; i < len; ++i) {
       uint8_t key = (len == 32 ? i : i + 32);
       if (data[i] != keybed[key]) {
@@ -85,7 +86,7 @@ inline void handle_midi_packet(uint8_t* data, uint8_t len) {
   } else {
     Serial.print("unexpected midi packet length: ");
     Serial.println(len);
-  }
+  }*/
 }
 
 void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {
@@ -155,7 +156,7 @@ void requestEvent() {
 ///////////////////////////////////////// MAIN
 
 void setup() {
-  memset(keybed, 0, 49);
+  //memset(keybed, 0, 49);
   pinMode(LED_BUILTIN, OUTPUT);
   Serial.begin(115200);
   initRadio();

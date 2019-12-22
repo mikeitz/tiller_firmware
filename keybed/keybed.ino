@@ -1,14 +1,18 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
 
-uint8_t keybed[49];
-bool changed = false;
-volatile bool request_resync = false;
+const uint8_t PIPE = 7;
+const bool DEBUG = 0;
+
+//uint8_t keybed[49];
+//volatile bool request_resync = false;
 
 /////// RADIO
 
-const uint8_t PIPE = 7;
-const bool DEBUG = 1;
+const uint16_t buffer_size = 1024;
+volatile uint16_t midi_keys[buffer_size];
+volatile uint32_t index_written = 0;
+volatile uint32_t index_read = 0;
 
 uint8_t ack_payload[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 uint32_t ack_payload_length = 0;
@@ -35,7 +39,7 @@ void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info
 }
 void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
   if (DEBUG) Serial.println("X");
-  request_resync = true;
+  //request_resync = true;
 }
 void nrf_gzll_disabled() {}
 void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {}
@@ -53,7 +57,7 @@ void initMatrix() {
   memset(last2, 255, 8);
   memset(time1, 0, 64 * 4);
   memset(time2, 0, 64 * 4);
-  memset(keybed, 0, 49);
+  //memset(keybed, 0, 49);
 }
 
 inline uint8_t note(uint8_t i, uint8_t j) {
@@ -66,29 +70,29 @@ inline uint8_t vel(long t) {
   return min(127, max(1, t));
 }
 
+const char name[][3] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+
 inline void noteOn(uint8_t i, uint8_t j, unsigned long t) {
-  transmit(note(i, j), vel(t) | 0x80);
+  enqueue(note(i, j), vel(t) | 0x80);
 }
 
 inline void noteOff(uint8_t i, uint8_t j, unsigned long t) {
-  transmit(note(i, j), vel(t));
+  enqueue(note(i, j), vel(t));
 }
 
-inline void transmit(uint8_t n, uint8_t v) {
-  keybed[n - 36] = v;
-  request_resync = true;
-  if (request_resync) {
-    // Don't send more individual notes until resync succeeds.
-    return;
-  }
-  uint16_t data = (n << 8) | v;
-  nrf_gzll_add_packet_to_tx_fifo(PIPE, (uint8_t*)&data, 2);
+inline void enqueue(uint8_t n, uint8_t v) {
+  //keybed[n - 36] = v;
+  //if (request_resync) {
+  //  return;
+  //}
+  midi_keys[index_written % buffer_size] = (n << 8) | v | 0x8000;
+  index_written++;
 }
 
-inline void resync() {
+/*inline void resync() {
   nrf_gzll_add_packet_to_tx_fifo(PIPE, keybed, 32);
   nrf_gzll_add_packet_to_tx_fifo(PIPE, keybed + 32, 49 - 32);
-}
+}*/
 
 inline void updateScan(unsigned long t, uint8_t i, uint8_t scan1, uint8_t scan2) {
   if (scan1 != last1[i]) {
@@ -164,6 +168,10 @@ void setup() {
   // Turn off LED
   pinMode(7, OUTPUT);
   digitalWrite(7, HIGH);
+
+  NRF_GPIO->OUTSET = rowMask;
+  NRF_GPIO->OUTCLR = rowScan[0];
+  delay(1);
 }
 
 inline uint8_t scanUpper(uint32_t s) {
@@ -177,17 +185,28 @@ inline uint8_t scanLower(uint32_t s) {
 }
 
 void loop() {
-  NRF_GPIO->OUTSET = rowMask;
   for(uint8_t i = 0; i < 8; ++i) {
-    NRF_GPIO->OUTCLR = rowScan[i];
-    unsigned long t = micros();
     uint32_t scan = NRF_GPIO->IN;
-    updateScan(t, i, scanUpper(scan), scanLower(scan));
     NRF_GPIO->OUTSET = rowMask;
+    NRF_GPIO->OUTCLR = rowScan[(i + 1) % 8];
+    unsigned long t = micros();
+    updateScan(t, i, scanUpper(scan), scanLower(scan));
   }
-  if (request_resync) {
+  
+  /*if (request_resync) {
     request_resync = false;
     resync();
+  }*/
+
+  // Move as many queued notes to the transmit queue as will fit.
+  while (index_read < index_written) {
+    int num = min(16, index_written - index_read);
+    num = min(num, buffer_size - index_read % buffer_size);
+    if (nrf_gzll_add_packet_to_tx_fifo(PIPE, (uint8_t*)&midi_keys[index_read % buffer_size], 2 * num)) {
+      index_read += num;
+    } else {
+      break;
+    }
   }
   delay(1);
 }
