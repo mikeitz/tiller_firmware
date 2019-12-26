@@ -2,26 +2,23 @@
 #include "Wire.h"
 #include "MD_CirQueue.h"
 
-#define CC_COUNT 4
 
 const uint8_t num_cols = 7;
 const uint8_t num_rows = 8; // If num_rows > 8, need to use bigger types for matrix.
+
 const uint8_t CHECK_BYTE = 0x55;
+#define I2C_ADDRESS 2
+#define CC_COUNT 0
 
 struct host_packet_t {
   uint8_t matrix[num_rows];
-  uint8_t cc[0];
+  uint8_t cc[CC_COUNT];
   uint16_t midi_note;
   uint8_t check_byte;
 };
 host_packet_t host_packet;
 
-#define I2C_ADDRESS 2
-
 static uint8_t channel_table[6] = {4, 25, 42, 63, 77, 33};
-
-unsigned long lastPacket = 0;
-
 uint8_t new_data[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 uint8_t per_pipe_data[8][NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 uint32_t per_pipe_length[8];
@@ -33,10 +30,7 @@ struct half_packet_t {
   uint32_t state = 0;
 };
 
-#define OFFLINE_TIME 2000
-
-// uint8_t keybed[49];
-
+// Ring buffer for midi notes.
 const uint16_t buffer_size = 1024;
 volatile uint16_t midi_keys[buffer_size];
 volatile uint32_t index_written = 0;
@@ -66,27 +60,9 @@ void nrf_gzll_disabled() {}
 inline void handle_midi_packet(uint8_t* data, uint8_t len) {
   for (int i = 0; i < len; i += 2) {
     uint16_t msg = *(uint16_t*)&data[i];
-    //uint8_t n = (msg >> 8) & 0x7f;
-    //keybed[n - 36] = msg & 0xff;
     midi_keys[index_written % buffer_size] = msg | 0x8000;
     index_written++;
   }
-  /*else if (len == 32 || len == (49 - 32)){
-    for (uint8_t i = 0; i < len; ++i) {
-      uint8_t key = (len == 32 ? i : i + 32);
-      if (data[i] != keybed[key]) {
-        keybed[key] = data[i];
-        uint16_t msg = 0x80 | (key + 36);
-        msg <<= 8;
-        msg |= keybed[key];
-        midi_keys[index_written % buffer_size] = msg;
-        index_written++;
-      }
-    }
-  } else {
-    Serial.print("unexpected midi packet length: ");
-    Serial.println(len);
-  }*/
 }
 
 void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {
@@ -101,7 +77,7 @@ void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
   }
 }
 
-inline void mergeLeft(half_packet_t packet, int pipe) {
+inline void mergeLeft(half_packet_t packet) {
   uint32_t half = packet.state;
   host_packet.matrix[0] |= (half >> 0) & 0x3f;
   host_packet.matrix[1] |= (half >> 7) & 0x3f;
@@ -109,7 +85,7 @@ inline void mergeLeft(half_packet_t packet, int pipe) {
   host_packet.matrix[3] |= (getHalf(half, 0, 6) << 4) | (getHalf(half, 1, 6) << 5) | (getHalf(half, 2, 6) << 6);
 }
 
-inline void mergeRight(half_packet_t packet, int pipe) {
+inline void mergeRight(half_packet_t packet) {
   uint32_t half = packet.state;
   host_packet.matrix[4] |= (half >> 0) & 0x7e;
   host_packet.matrix[5] |= (half >> 7) & 0x7e;
@@ -127,22 +103,12 @@ void initWire() {
 void requestEvent() {
   memset(&host_packet, 0, sizeof(host_packet_t));
   host_packet.check_byte = CHECK_BYTE;
-  if (per_pipe_length[0] > 0) {
-    for (int i = 0; i < num_rows; i++) {
-      host_packet.matrix[i] = per_pipe_data[0][i];
-    }
-  }
-  if (per_pipe_length[1] > 0) {
-    mergeLeft(*(half_packet_t*)(per_pipe_data[1]), 1);
-  }
-  if (per_pipe_length[2] > 0) {
-    mergeRight(*(half_packet_t*)(per_pipe_data[2]), 2);
-  }
+
   if (per_pipe_length[3] > 0) {
-    mergeLeft(*(half_packet_t*)(per_pipe_data[3]), 3);
+    mergeLeft(*(half_packet_t*)(per_pipe_data[3]));
   }
   if (per_pipe_length[4] > 0) {
-    mergeRight(*(half_packet_t*)(per_pipe_data[4]), 4);
+    mergeRight(*(half_packet_t*)(per_pipe_data[4]));
   }
 
   if (index_read < index_written) {
@@ -166,6 +132,4 @@ void setup() {
   suspendLoop();
 }
 
-void loop() {
-
-}
+void loop() {}

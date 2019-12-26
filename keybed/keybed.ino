@@ -4,9 +4,6 @@
 const uint8_t PIPE = 7;
 const bool DEBUG = 0;
 
-//uint8_t keybed[49];
-//volatile bool request_resync = false;
-
 /////// RADIO
 
 const uint16_t buffer_size = 1024;
@@ -39,7 +36,6 @@ void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info
 }
 void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
   if (DEBUG) Serial.println("X");
-  //request_resync = true;
 }
 void nrf_gzll_disabled() {}
 void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {}
@@ -57,7 +53,6 @@ void initMatrix() {
   memset(last2, 255, 8);
   memset(time1, 0, 64 * 4);
   memset(time2, 0, 64 * 4);
-  //memset(keybed, 0, 49);
 }
 
 inline uint8_t note(uint8_t i, uint8_t j) {
@@ -81,18 +76,9 @@ inline void noteOff(uint8_t i, uint8_t j, unsigned long t) {
 }
 
 inline void enqueue(uint8_t n, uint8_t v) {
-  //keybed[n - 36] = v;
-  //if (request_resync) {
-  //  return;
-  //}
   midi_keys[index_written % buffer_size] = (n << 8) | v | 0x8000;
   index_written++;
 }
-
-/*inline void resync() {
-  nrf_gzll_add_packet_to_tx_fifo(PIPE, keybed, 32);
-  nrf_gzll_add_packet_to_tx_fifo(PIPE, keybed + 32, 49 - 32);
-}*/
 
 inline void updateScan(unsigned long t, uint8_t i, uint8_t scan1, uint8_t scan2) {
   if (scan1 != last1[i]) {
@@ -192,11 +178,6 @@ void loop() {
     unsigned long t = micros();
     updateScan(t, i, scanUpper(scan), scanLower(scan));
   }
-  
-  /*if (request_resync) {
-    request_resync = false;
-    resync();
-  }*/
 
   // Move as many queued notes to the transmit queue as will fit.
   while (index_read < index_written) {
