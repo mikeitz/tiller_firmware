@@ -2,7 +2,21 @@
 #include "nrf_gzll.h"
 
 const uint8_t PIPE = 7;
-const bool DEBUG = 0;
+const bool DEBUG = 1;
+
+/////// LAYOUT
+
+const uint8_t rows[8] = {16, 14, 17, 13, 18, 12, 19, 11};
+const uint8_t cols1[8] = {31, 30, 29, 28, 25, 24, 20};
+const uint8_t cols2[8] = {2, 3, 4, 5, 8, 9, 10};
+
+uint32_t rowsScan[8];
+uint32_t cols1Scan[7];
+uint32_t cols2Scan[7];
+
+uint32_t rowsMask = 0;
+uint32_t cols1Mask = 0;
+uint32_t cols2Mask = 0;
 
 /////// RADIO
 
@@ -45,12 +59,12 @@ void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
 #define VMIN 3000
 #define VMAX 50000
 
-uint8_t last1[8], last2[8];
+uint32_t last1[8], last2[8];
 unsigned long time1[64], time2[64];
 
 void initMatrix() {
-  memset(last1, 255, 8);
-  memset(last2, 255, 8);
+  memset(last1, 255, 8 * 4);
+  memset(last2, 255, 8 * 4);
   memset(time1, 0, 64 * 4);
   memset(time2, 0, 64 * 4);
 }
@@ -80,10 +94,13 @@ inline void enqueue(uint8_t n, uint8_t v) {
   index_written++;
 }
 
-inline void updateScan(unsigned long t, uint8_t i, uint8_t scan1, uint8_t scan2) {
+inline void updateScan(unsigned long t, uint8_t i, uint32_t scan) {
+  uint32_t scan1 = scan & cols1Mask;
+  uint32_t scan2 = scan & cols2Mask;
+
   if (scan1 != last1[i]) {
     for (uint8_t j = 0; j < 7; ++j) {
-      uint8_t b = 1 << j;
+      uint32_t b = cols1Scan[j];
       uint8_t k = 8 * i + j;
       if ((scan1 & b) && !(last1[i] & b)) { // released
         if (time2[k] != 0 && time1[k] == 0) {
@@ -99,7 +116,7 @@ inline void updateScan(unsigned long t, uint8_t i, uint8_t scan1, uint8_t scan2)
   }
   if (scan2 != last2[i]) {
     for (uint8_t j = 0; j < 7; ++j) {
-      uint8_t b = 1 << j;
+      uint32_t b = cols2Scan[j];
       uint8_t k = 8 * i + j;
       if ((scan2 & b) && !(last2[i] & b)) { // released
         time2[k] = t;
@@ -116,10 +133,6 @@ inline void updateScan(unsigned long t, uint8_t i, uint8_t scan1, uint8_t scan2)
 }
 
 /////// CORE IO
-
-const uint8_t rows[8] = {2, 3, 4, 5, 28, 29, 30, 31};
-uint32_t rowScan[8];
-uint32_t rowMask = 0;
 
 void nfcAsGpio() {
   if ((NRF_UICR->NFCPINS & UICR_NFCPINS_PROTECT_Msk) == (UICR_NFCPINS_PROTECT_NFC << UICR_NFCPINS_PROTECT_Pos)){
@@ -141,13 +154,18 @@ void setup() {
   } else {
     Serial.end();
   }
-  for (int i = 9; i <= 23; ++i) {
-    if (i == 21) continue;
-    pinMode(i, INPUT_PULLUP);
+
+  for (int i = 0; i < 7; ++i) {
+    pinMode(cols1[i], INPUT_PULLUP);
+    pinMode(cols2[i], INPUT_PULLUP);
+    cols1Scan[i] = (1UL << cols1[i]);
+    cols2Scan[i] = (1UL << cols2[i]);
+    cols1Mask |= cols1Scan[i];
+    cols2Mask |= cols2Scan[i];
   }
-  for (int i = 0; i <= 8; ++i) {
+  for (int i = 0; i < 8; ++i) {
     pinMode(rows[i], OUTPUT);
-    rowMask |= (rowScan[i] = (1UL << rows[i]));
+    rowsMask |= (rowsScan[i] = (1UL << rows[i]));
   }
   initMatrix();
   initRadio();
@@ -155,28 +173,18 @@ void setup() {
   pinMode(7, OUTPUT);
   digitalWrite(7, HIGH);
 
-  NRF_GPIO->OUTSET = rowMask;
-  NRF_GPIO->OUTCLR = rowScan[0];
+  NRF_GPIO->OUTSET = rowsMask;
+  NRF_GPIO->OUTCLR = rowsScan[0];
   delay(1);
-}
-
-inline uint8_t scanUpper(uint32_t s) {
-  // 16, 17, 18, 19, 20, 22, 23
-  return ((s >> 16) & 0x1fUL) | ((s >> 17) & 0x60UL);
-}
-
-inline uint8_t scanLower(uint32_t s) {
-  // 9, 10, 11, 12, 13, 14, 15
-  return (s >> 9) & 0x7fUL;
 }
 
 void loop() {
   for(uint8_t i = 0; i < 8; ++i) {
     uint32_t scan = NRF_GPIO->IN;
-    NRF_GPIO->OUTSET = rowMask;
-    NRF_GPIO->OUTCLR = rowScan[(i + 1) % 8];
+    NRF_GPIO->OUTSET = rowsMask;
+    NRF_GPIO->OUTCLR = rowsScan[(i + 1) % 8];
     unsigned long t = micros();
-    updateScan(t, i, scanUpper(scan), scanLower(scan));
+    updateScan(t, i, scan);
   }
 
   // Move as many queued notes to the transmit queue as will fit.
