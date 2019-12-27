@@ -38,15 +38,15 @@ void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
 /////// XMIT QUEUE
 
 const uint16_t buffer_size = 1024;
-volatile uint16_t midi_keys[buffer_size];
+volatile uint32_t midi_keys[buffer_size];
 volatile uint32_t index_written = 0;
 volatile uint32_t index_read = 0;
 
 inline void transmitFromQueue() {
   while (index_read < index_written) {
-    int num = min(16, index_written - index_read);
+    int num = min(8, index_written - index_read);
     num = min(num, buffer_size - index_read % buffer_size);
-    if (nrf_gzll_add_packet_to_tx_fifo(PIPE, (uint8_t*)&midi_keys[index_read % buffer_size], 2 * num)) {
+    if (nrf_gzll_add_packet_to_tx_fifo(PIPE, (uint8_t*)&midi_keys[index_read % buffer_size], 4 * num)) {
       index_read += num;
     } else {
       break;
@@ -54,33 +54,12 @@ inline void transmitFromQueue() {
   }
 }
 
-inline void enqueue(uint8_t n, uint8_t v) {
-  midi_keys[index_written % buffer_size] = (n << 8) | v | 0x8000;
+inline void enqueue(uint8_t n, unsigned long t, bool down) {
+  uint32_t msg = n;
+  msg <<= 24;
+  msg |= min(t/100, 0xffff) | (down ? 0x010000 : 0);
+  midi_keys[index_written % buffer_size] = msg;
   index_written++;
-}
-
-/////// UTILS
-
-const char name[][3] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-#define VMIN 3000
-#define VMAX 50000
-
-inline uint8_t note(uint8_t i, uint8_t j) {
-  return j * 8 + i + 32;
-}
-
-inline uint8_t vel(long t) {
-  t = (t - VMIN) * 127 / VMAX;
-  t = 127 - t;
-  return min(127, max(1, t));
-}
-
-inline void noteOn(uint8_t i, uint8_t j, unsigned long t) {
-  enqueue(note(i, j), vel(t) | 0x80);
-}
-
-inline void noteOff(uint8_t i, uint8_t j, unsigned long t) {
-  enqueue(note(i, j), vel(t));
 }
 
 /////// MATRIX
@@ -89,11 +68,16 @@ const uint8_t rows[8] = {16, 14, 17, 13, 18, 12, 19, 11};
 const uint8_t cols1[8] = {31, 30, 29, 28, 25, 24, 20};
 const uint8_t cols2[8] = {2, 3, 4, 5, 8, 9, 10};
 
+const char name[][3] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
 uint32_t last1[8], last2[8];
 unsigned long time1[64], time2[64];
 uint32_t rowsScan[8], cols1Scan[7], cols2Scan[7];
 uint32_t rowsMask = 0, cols1Mask = 0, cols2Mask = 0;
+
+inline uint8_t note(uint8_t i, uint8_t j) {
+  return j * 8 + i + 32;
+}
 
 void initMatrix() {
   memset(last1, 255, 8 * 4);
@@ -124,7 +108,7 @@ inline void updateScan(unsigned long t, uint8_t i, uint32_t scan) {
       uint8_t k = 8 * i + j;
       if ((scan1 & b) && !(last1[i] & b)) { // released
         if (time2[k] != 0 && time1[k] == 0) {
-          noteOff(i, j, t - time2[k]);
+          enqueue(note(i, j), t - time2[k], false);
         }
         time1[k] = time2[k] = 0;
       }
@@ -144,7 +128,7 @@ inline void updateScan(unsigned long t, uint8_t i, uint32_t scan) {
       }
       if (!(scan2 & b) && (last2[i] & b)) { // pressed
         if (time1[k] != 0 && time2[k] == 0) {
-          noteOn(i, j, t - time1[k]);
+          enqueue(note(i, j), t - time1[k], true);
         }
         time1[k] = time2[k] = 0;
       }

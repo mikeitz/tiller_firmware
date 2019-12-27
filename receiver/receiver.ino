@@ -13,7 +13,7 @@ const uint8_t CHECK_BYTE = 0x55;
 struct host_packet_t {
   uint8_t matrix[num_rows];
   uint8_t cc[CC_COUNT];
-  uint16_t midi_note;
+  uint32_t midi_note;
   uint8_t check_byte;
 };
 host_packet_t host_packet;
@@ -32,7 +32,7 @@ struct half_packet_t {
 
 // Ring buffer for midi notes.
 const uint16_t buffer_size = 1024;
-volatile uint16_t midi_keys[buffer_size];
+volatile uint32_t midi_keys[buffer_size];
 volatile uint32_t index_written = 0;
 volatile uint32_t index_read = 0;
 
@@ -58,9 +58,9 @@ void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info)
 void nrf_gzll_disabled() {}
 
 inline void handle_midi_packet(uint8_t* data, uint8_t len) {
-  for (int i = 0; i < len; i += 2) {
-    uint16_t msg = *(uint16_t*)&data[i];
-    midi_keys[index_written % buffer_size] = msg | 0x8000;
+  for (int i = 0; i < len; i += 4) {
+    uint32_t msg = *(uint32_t*)&data[i];
+    midi_keys[index_written % buffer_size] = msg | 0x80000000;
     index_written++;
   }
 }
