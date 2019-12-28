@@ -68,7 +68,7 @@ inline void handle_midi_packet(uint8_t* data, uint8_t len) {
 void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {
   uint32_t new_length = NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH;
   if (nrf_gzll_fetch_packet_from_rx_fifo(pipe, new_data, &new_length)) {
-    if (pipe >= 6) {
+    if (pipe >= 5) {
       handle_midi_packet(new_data, new_length);
     } else {
       per_pipe_length[pipe] = new_length;

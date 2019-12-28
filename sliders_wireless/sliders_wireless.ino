@@ -1,7 +1,7 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
 
-#define PIPE 6
+#define PIPE 5
 #define DEBUG 0
 
 // 5 is joystick
@@ -77,8 +77,15 @@ class Slider {
   uint32_t last_cc_ = 0;
 };
 
+#if PIPE == 6
 auto mod = Slider(A2, 0);
 auto vib = Slider(A4, 1);
+#endif
+
+#if PIPE == 5
+auto mod = Slider(A2, 3);
+auto vib = Slider(A4, 4);
+#endif
 
 void setup() {
   Serial.begin(115200);
