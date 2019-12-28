@@ -56,8 +56,8 @@ inline void transmitFromQueue() {
 
 inline void enqueue(uint8_t n, unsigned long t, bool down) {
   uint32_t msg = n;
-  msg <<= 24;
-  msg |= min(t/100, 0xffff) | (down ? 0x010000 : 0);
+  msg <<= 16;
+  msg |= min(t/100, 0xffff) | (down ? 0x10000000 : 0x20000000);
   midi_keys[index_written % buffer_size] = msg;
   index_written++;
 }

@@ -8,11 +8,9 @@ const uint8_t num_rows = 8; // If num_rows > 8, need to use bigger types for mat
 
 const uint8_t CHECK_BYTE = 0x55;
 #define I2C_ADDRESS 2
-#define CC_COUNT 0
 
 struct host_packet_t {
   uint8_t matrix[num_rows];
-  uint8_t cc[CC_COUNT];
   uint32_t midi_note;
   uint8_t check_byte;
 };
@@ -60,15 +58,17 @@ void nrf_gzll_disabled() {}
 inline void handle_midi_packet(uint8_t* data, uint8_t len) {
   for (int i = 0; i < len; i += 4) {
     uint32_t msg = *(uint32_t*)&data[i];
-    midi_keys[index_written % buffer_size] = msg | 0x80000000;
-    index_written++;
+    if (msg) {
+      midi_keys[index_written % buffer_size] = msg;
+      index_written++;
+    }
   }
 }
 
 void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {
   uint32_t new_length = NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH;
   if (nrf_gzll_fetch_packet_from_rx_fifo(pipe, new_data, &new_length)) {
-    if (pipe == 7) {
+    if (pipe >= 6) {
       handle_midi_packet(new_data, new_length);
     } else {
       per_pipe_length[pipe] = new_length;

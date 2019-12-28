@@ -2,7 +2,7 @@
 #include "nrf_gzll.h"
 
 #define PIPE 6
-#define DEBUG 1
+#define DEBUG 0
 
 // 5 is joystick
 // 6 is sliders
@@ -10,11 +10,9 @@
 uint8_t ack_payload[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 uint32_t ack_payload_length = 0;
 uint8_t data_buffer[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
-#if (PIPE % 2)
-  uint8_t channel_table[3] = {25, 63, 33};
-#else
-  uint8_t channel_table[3] = {4, 42, 77};
-#endif
+uint8_t channel_table[3] = {4, 42, 77};
+
+uint32_t data[2];
 
 void initRadio() {
   nrf_gzll_init(NRF_GZLL_MODE_DEVICE);
@@ -51,7 +49,7 @@ class Slider {
     #else
     uint32_t cc = sense * 128 / 940;
     #endif
-    cc = min(127, max(0, cc));
+    cc = 127 - min(127, max(0, cc));
   
     if (cc != last_cc_ && abs((int)last_sense_ - (int)sense) > 7) {
       last_sense_ = sense;
@@ -65,8 +63,12 @@ class Slider {
     }
     return false;
   }
-  uint8_t Value() {
-    return last_cc_;
+  uint32_t Message() {
+    uint32_t msg = (3 /*cc*/ << 28) | (cc_num_ << 16) | last_cc_;
+    #if DEBUG
+    Serial.println(msg, HEX);
+    #endif
+    return msg;
   }
  private:
   uint8_t pin_;
@@ -84,14 +86,15 @@ void setup() {
 }
 
 void loop() {
-  bool transmit = false;
-  transmit |= mod.Update();
-  transmit |= vib.Update();
-  if (transmit) {
-    uint16_t data = mod.Value();
-    data <<= 8;
-    data |= vib.Value();
-    nrf_gzll_add_packet_to_tx_fifo(PIPE, (uint8_t*)&data, 2);
+  uint8_t num = 0;
+  if(mod.Update()) {
+    data[num++] = mod.Message();
+  }
+  if(vib.Update()) {
+    data[num++] = vib.Message();
+  }
+  if (num) {
+    nrf_gzll_add_packet_to_tx_fifo(PIPE, (uint8_t*)data, num * 4);
   }
   delay(20);
 }
