@@ -39,7 +39,7 @@ void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
 
 class Slider {
  public:
-  Slider(int pin, int cc) : cc_num_(cc), pin_(pin) {
+  Slider(int pin, int cc, bool invert) : cc_num_(cc), pin_(pin), invert_(invert) {
     pinMode(pin_, INPUT);
   }
   bool Update() {
@@ -49,7 +49,10 @@ class Slider {
     #else
     uint32_t cc = sense * 128 / 940;
     #endif
-    cc = 127 - min(127, max(0, cc));
+    if (invert_) {
+      cc = 127 - cc;
+    }
+    cc = min(127, max(0, cc));
   
     if (cc != last_cc_ && abs((int)last_sense_ - (int)sense) > 7) {
       last_sense_ = sense;
@@ -75,16 +78,17 @@ class Slider {
   uint8_t cc_num_;
   uint32_t last_sense_ = 0;
   uint32_t last_cc_ = 0;
+  bool invert_ = false;
 };
 
 #if PIPE == 6
-auto mod = Slider(A2, 0);
-auto vib = Slider(A4, 1);
+auto mod = Slider(A2, 0, true);
+auto vib = Slider(A4, 1, true);
 #endif
 
 #if PIPE == 5
-auto mod = Slider(A2, 3);
-auto vib = Slider(A4, 4);
+auto mod = Slider(A2, 2, false);
+auto vib = Slider(A4, 3, false);
 #endif
 
 void setup() {
