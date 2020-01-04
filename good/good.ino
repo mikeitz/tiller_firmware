@@ -15,7 +15,7 @@ const uint8_t keys = num_rows * num_cols;
     const uint8_t cols[num_cols] = {PIN_SPI_MISO, PIN_A2, PIN_SPI_MOSI, PIN_A1, PIN_SPI_SCK, PIN_A0, PIN_NFC2};
     const uint8_t pipe = 1;
   #else
-    const uint8_t rows[num_rows] = {10, 9yyy, 6};
+    const uint8_t rows[num_rows] = {10, 9, 6};
     const uint8_t cols[num_cols] = {PIN_NFC2, 13, 5, 12, PIN_WIRE_SCL, 11, PIN_WIRE_SDA};
     const uint8_t pipe = 2;
   #endif

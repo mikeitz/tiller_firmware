@@ -108,7 +108,7 @@ void requestEvent() {
     mergeLeft(*(half_packet_t*)(per_pipe_data[1]));
   }
   if (per_pipe_length[2] > 0) {
-    mergeRight(*(half_packet_t*)(per_pipe_data[2tr]));
+    mergeRight(*(half_packet_t*)(per_pipe_data[2]));
   }
 
   if (per_pipe_length[3] > 0) {
