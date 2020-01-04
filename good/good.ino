@@ -1,21 +1,53 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
 
+#define SIDE 0
+#define MARK 4
 const uint8_t debug = 0;
-const uint8_t pipe = 4;
 
 const uint8_t num_rows = 3;
 const uint8_t num_cols = 7;
 const uint8_t keys = num_rows * num_cols;
 
-const uint8_t rows[num_rows] = {13, 12, 11};
-const uint8_t cols_slim[num_cols] = {PIN_A0, PIN_A1, PIN_A2, PIN_A3, PIN_A4, PIN_A5, PIN_SPI_SCK};
-const uint8_t cols_thick[num_cols] = {PIN_SPI_SCK, PIN_A5, PIN_A4, PIN_A3, PIN_A2, PIN_A1, PIN_A0};
-const uint8_t* cols = nullptr;
+#if MARK == 4
+  #if SIDE == 0
+    const uint8_t rows[num_rows] = {PIN_A3, PIN_A4, PIN_A5};
+    const uint8_t cols[num_cols] = {PIN_SPI_MISO, PIN_A2, PIN_SPI_MOSI, PIN_A1, PIN_SPI_SCK, PIN_A0, PIN_NFC2};
+    const uint8_t pipe = 1;
+  #else
+    const uint8_t rows[num_rows] = {10, 9yyy, 6};
+    const uint8_t cols[num_cols] = {PIN_NFC2, 13, 5, 12, PIN_WIRE_SCL, 11, PIN_WIRE_SDA};
+    const uint8_t pipe = 2;
+  #endif
+#endif
+
+#if MARK == 3
+  #if SIDE == 0
+    const uint8_t rows[num_rows] = {13, 12, 11};
+    const uint8_t cols[num_cols] = {PIN_SPI_SCK, PIN_A5, PIN_A4, PIN_A3, PIN_A2, PIN_A1, PIN_A0};
+    const uint8_t pipe = 3;
+  #else
+    const uint8_t rows[num_rows] = {13, 12, 11};
+    const uint8_t cols[num_cols] = {PIN_SPI_SCK, PIN_A5, PIN_A4, PIN_A3, PIN_A2, PIN_A1, PIN_A0};
+    const uint8_t pipe = 4;
+  #endif
+#endif
+
+#if MARK == 2
+  #if SIDE == 0
+    const uint8_t rows[num_rows] = {13, 12, 11};
+    const uint8_t cols[num_cols] = {PIN_A0, PIN_A1, PIN_A2, PIN_A3, PIN_A4, PIN_A5, PIN_SPI_SCK};
+    const uint8_t pipe = 1;
+  #else
+    const uint8_t rows[num_rows] = {13, 12, 11};
+    const uint8_t cols[num_cols] = {PIN_A0, PIN_A1, PIN_A2, PIN_A3, PIN_A4, PIN_A5, PIN_SPI_SCK};
+    const uint8_t pipe = 2;
+  #endif
+#endif
 
 const uint8_t delayPerTick = 2;
-const uint8_t debounceDownTicks = 3;
-const uint8_t debounceUpTicks = 3;
+const uint8_t debounceDownTicks = 4;
+const uint8_t debounceUpTicks = 4;
 const uint16_t sleepAfterIdleTicks = 1000/delayPerTick;
 const uint16_t repeatTransmitTicks = 500/delayPerTick;
 
@@ -60,11 +92,6 @@ void printMatrix(matrix_t state) {
 }
 
 void initMatrix() {
-  if (pipe == 3 || pipe == 4) {
-    cols = cols_thick;
-  } else {
-    cols = cols_slim;
-  }
   for (int r = 0; r < num_rows; ++r) {
     pinMode(rows[r], OUTPUT);
     digitalWrite(rows[r], HIGH);
@@ -193,10 +220,23 @@ void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
 
 ///////////////////////////////////////////////////// MAIN
 
+void nfcAsGpio() {
+  if ((NRF_UICR->NFCPINS & UICR_NFCPINS_PROTECT_Msk) == (UICR_NFCPINS_PROTECT_NFC << UICR_NFCPINS_PROTECT_Pos)){
+    NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos;
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+    NRF_UICR->NFCPINS &= ~UICR_NFCPINS_PROTECT_Msk;
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+    NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+    NVIC_SystemReset();
+  }
+}
+
 void setup() {
   if (debug) {
     Serial.begin(115200);
   }
+  nfcAsGpio();
   initCore();
   initMatrix();
   initRadio();

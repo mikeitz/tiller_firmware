@@ -104,6 +104,13 @@ void requestEvent() {
   memset(&host_packet, 0, sizeof(host_packet_t));
   host_packet.check_byte = CHECK_BYTE;
 
+  if (per_pipe_length[1] > 0) {
+    mergeLeft(*(half_packet_t*)(per_pipe_data[1]));
+  }
+  if (per_pipe_length[2] > 0) {
+    mergeRight(*(half_packet_t*)(per_pipe_data[2tr]));
+  }
+
   if (per_pipe_length[3] > 0) {
     mergeLeft(*(half_packet_t*)(per_pipe_data[3]));
   }
