@@ -129,7 +129,6 @@ void requestEvent() {
 ///////////////////////////////////////// MAIN
 
 void setup() {
-  //memset(keybed, 0, 49);
   pinMode(LED_BUILTIN, OUTPUT);
   Serial.begin(115200);
   initRadio();

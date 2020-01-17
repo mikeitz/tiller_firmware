@@ -63,7 +63,7 @@ void initMatrix() {
     pinMode(cols[c], INPUT_PULLUP);
   }
   ticksSinceDiff = 0;
-  ticksSinceTransmit = repeatTransmitTicks;
+  ticksSinceTransmit = repeatTransmitTicks + 1;
   state = 0;
   lastScan = 0;
   debounceCount = 0;
@@ -124,10 +124,11 @@ void sleep() {
 }
 
 void wake() {
-  sleeping = false;
-  waking = true;
   NRF_GPIOTE->EVENTS_PORT = 0;
   NRF_GPIOTE->INTENCLR |= GPIOTE_INTENSET_PORT_Msk;
+  if (!sleeping) return;
+  sleeping = false;
+  waking = true;
   resumeLoop();
 }
 
