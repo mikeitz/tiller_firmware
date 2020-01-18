@@ -45,21 +45,17 @@ const uint8_t keys = num_rows * num_cols;
   #endif
 #endif
 
-#define NOP __asm__("nop\n\t")
-
 const uint8_t delayPerTick = 2;
-const uint8_t debounceTicks = 4;
+const uint8_t debounceDownTicks = 4;
+const uint8_t debounceUpTicks = 4;
 const uint16_t sleepAfterIdleTicks = 1000/delayPerTick;
 const uint16_t repeatTransmitTicks = 500/delayPerTick;
 
 typedef uint32_t matrix_t;
-
 matrix_t state = 0;
-matrix_t debounceState = 0;
-uint8_t debounceCount = 0;
-
 uint16_t ticksSinceDiff = 0;
 uint16_t ticksSinceTransmit = 0;
+uint8_t debounceTicks[keys];
 volatile bool sleeping = false;
 volatile bool waking = true;
 
@@ -106,15 +102,13 @@ void initMatrix() {
   ticksSinceDiff = 0;
   ticksSinceTransmit = repeatTransmitTicks;
   state = 0;
-  debounceState = 0;
-  debounceCount = 0;
+  memset(debounceTicks, 0, sizeof(debounceTicks));
 }
 
 matrix_t scanMatrix() {
   matrix_t scan = 0;
   for (int r = 0; r < num_rows; ++r) {
     digitalWrite(rows[r], LOW);
-    NOP;
     for (int c = 0; c < num_cols; ++c) {
       set(&scan, r, c, !digitalRead(cols[c]));
     }
@@ -125,18 +119,18 @@ matrix_t scanMatrix() {
 
 bool scanWithDebounce() {
   matrix_t scan = scanMatrix(); 
-  if (scan == state || scan != debounceState) {
-    debounceCount = 0;
-    debounceState = scan;
-    return false;
-  } else if (debounceCount > debounceTicks) {
-    state = scan;
-    debounceCount = 0;
-    return true;
-  } else {
-    debounceCount++;
-    return false;
+  bool diff = false;
+  for (int i = 0; i < keys; ++i) {
+    matrix_t b = ((matrix_t)1) << i;
+    if (debounceTicks[i] > 0) {
+      debounceTicks[i]--;
+    } else if ((scan & b) != (state & b)) {
+      state = (state & ~b) | (scan & b);
+      debounceTicks[i] = (scan & b) ? debounceDownTicks : debounceUpTicks;
+      diff = true;
+    }
   }
+  return diff;
 }
 
 ///////////////////////////////////////////////////// POWER
