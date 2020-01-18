@@ -73,8 +73,8 @@ inline matrix_t rc(uint8_t r, uint8_t c) {
   return ((matrix_t)1) << (c + r * num_cols);
 }
 
-inline matrix_t set(matrix_t s, uint8_t r, uint8_t c, bool v) {
-  return s | (v ? rc(r, c) : 0);
+inline void set(matrix_t *s, uint8_t r, uint8_t c, bool v) {
+  *s |= v ? rc(r, c) : 0;
 }
 
 inline bool get(matrix_t s, uint8_t r, uint8_t c) {
@@ -116,7 +116,7 @@ matrix_t scanMatrix() {
     digitalWrite(rows[r], LOW);
     NOP;
     for (int c = 0; c < num_cols; ++c) {
-      scan = set(scan, r, c, !digitalRead(cols[c]));
+      set(&scan, r, c, !digitalRead(cols[c]));
     }
     digitalWrite(rows[r], HIGH);
   }
