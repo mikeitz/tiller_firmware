@@ -45,22 +45,21 @@ const uint8_t keys = num_rows * num_cols;
   #endif
 #endif
 
-const uint8_t delayPerTick = 1;
-const uint8_t debounceTicks = 4;
+const uint8_t delayPerTick = 2;
+const uint8_t debounceTicks = 2;
 
-const uint16_t sleepAfterIdleTicks = 1000/delayPerTick;
-const uint16_t repeatTransmitTicks = 500/delayPerTick;
+const uint16_t sleepAfterIdleTicks = 1500/delayPerTick;
+const uint16_t repeatTransmitTicks = 400/delayPerTick;
 
 ///////////////////////////////////////////////////// MATRIX
 
+const uint64_t ONE = 1;
+uint64_t colMask; // Effectively const
+
 uint64_t stableRows[num_rows];
 uint64_t debounceRows[num_rows];
-uint64_t colMask;
-const uint64_t ONE = 1;
 int debounceCount = 0;
 bool keysDown = false;
-
-#define NOP __asm__("nop\n\t")
 
 void computeColMask() {
   colMask = 0;
@@ -79,21 +78,6 @@ uint32_t getState() {
     }
   }
   return state;
-}
-
-void printMatrix(uint32_t state) {
-  if (!debug) {
-    return;
-  }
-  Serial.println("");
-  for (uint8_t r = 0; r < num_rows; r++) {
-    for (uint8_t c = 0; c < num_cols; c++) {
-      Serial.print(1 & (state >> (r * num_cols + c)));
-    }
-    Serial.print(" ");
-  }
-  Serial.println("");
-  Serial.flush();
 }
 
 void initMatrix() {
@@ -127,11 +111,12 @@ void show(uint32_t x) {
 bool scanWithDebounce() {
   bool scanToDebounceDiff = false;
   bool scanToStableDiff = false;
+  bool anyKeys = false;
+  uint64_t scan;
   for (int r = 0; r < num_rows; ++r) {
     digitalWrite(rows[r], LOW);
-    uint64_t scan = NRF_P1->IN;
-    scan <<= 32;
-    scan |= NRF_P0->IN;
+    ((uint32_t*)&scan)[0] = NRF_P0->IN;
+    ((uint32_t*)&scan)[1] = NRF_P1->IN;
     digitalWrite(rows[r], HIGH);
     //if(!r)show(scan);
     scan = ~scan & colMask;
@@ -139,18 +124,21 @@ bool scanWithDebounce() {
     scanToStableDiff = scanToStableDiff || (scan != stableRows[r]);
     debounceRows[r] = scan;
   }
-  if (!scanToStableDiff) {
-    debounceCount = 0;
-    return false;
-  }
   if (scanToDebounceDiff) {
+    // Start/restart debouncing.
     debounceCount = debounceTicks;
     return false;
   }
   if (debounceCount > 0) {
+    // Holding steady, no new bounces.
     debounceCount--;
     return false;
   }
+  if (!scanToStableDiff) {
+    // Finished debouncing but no keys changed.
+    return false;
+  }
+  // Finished debouncing and something changed.
   keysDown = false;
   for (int r = 0; r < num_rows; ++r) {
     stableRows[r] = debounceRows[r];
@@ -240,7 +228,6 @@ void initRadio() {
 
 void transmit() {
   uint32_t state = getState();
-  // printMatrix(state);  
   nrf_gzll_add_packet_to_tx_fifo(pipe, (uint8_t*)&state, 4);
 }
 
@@ -257,7 +244,7 @@ void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
 
 ///////////////////////////////////////////////////// MAIN
 
-uint16_t ticksSinceDiff = 0;
+uint16_t ticksSinceActivity = 0;
 uint16_t ticksSinceTransmit = 0;
 
 void setup() {
@@ -270,32 +257,41 @@ void setup() {
 }
 
 void loop() {
+  delay(delayPerTick);
   if (sleeping) {
-    delay(delayPerTick);
-  } else if (waking) {
+    return;
+  }
+
+  if (waking) {
+    if (debug) { Serial.println("wake"); Serial.flush(); }
     waking = false;
     if (!debug && Serial) {
       Serial.end();
     }
     initMatrix();
-    transmit();
-    ticksSinceDiff = 0;
+    ticksSinceActivity = 0;
     ticksSinceTransmit = 0;
-  } else if (scanWithDebounce()) {
+  }
+
+  if (scanWithDebounce()) {
     if (debug) { show(getState()); Serial.flush(); }
     transmit();
-    ticksSinceDiff = 0;
-    delay(delayPerTick);
-  } else if (ticksSinceDiff > sleepAfterIdleTicks && !keysDown && debounceCount == 0) {
-    sleep();
-  } else if (ticksSinceTransmit > repeatTransmitTicks) {
-    transmit();
-    ticksSinceDiff++;
     ticksSinceTransmit = 0;
-    delay(delayPerTick);
+  } else if (ticksSinceTransmit > repeatTransmitTicks) {
+    if (debug) { Serial.println("xmit"); Serial.flush(); }
+    transmit();
+    ticksSinceTransmit = 0;
   } else {
-    ticksSinceDiff++;
     ticksSinceTransmit++;
-    delay(delayPerTick);
+  }
+
+  if (keysDown || debounceCount > 0) {
+    ticksSinceActivity = 0;
+  } else if (ticksSinceActivity > sleepAfterIdleTicks) {
+    if (debug) { Serial.println("sleep"); Serial.flush(); }
+    sleep();
+    return;
+  } else {
+    ticksSinceActivity++;
   }
 }
