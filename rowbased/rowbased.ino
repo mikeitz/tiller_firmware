@@ -2,12 +2,24 @@
 #include "nrf_gzll.h"
 
 #define SIDE 1
-#define MARK 4
+#define MARK 5
 const uint8_t debug = 0;
 
 const uint8_t num_rows = 3;
 const uint8_t num_cols = 7;
 const uint8_t keys = num_rows * num_cols;
+
+#if MARK == 5
+  #if SIDE == 0
+    const uint8_t rows[num_rows] = {PIN_A0, PIN_A3, PIN_SPI_SCK};
+    const uint8_t cols[num_cols] = {PIN_A1, PIN_A4, PIN_SPI_MOSI, PIN_A2, PIN_A5, PIN_SPI_MISO, PIN_NFC2};
+    const uint8_t pipe = 1;
+  #else
+    const uint8_t rows[num_rows] = {13, 10, 5};
+    const uint8_t cols[num_cols] = {PIN_NFC2, PIN_WIRE_SDA, 6, 11, PIN_WIRE_SCL, 9, 12};
+    const uint8_t pipe = 2;
+  #endif
+#endif
 
 #if MARK == 4
   #if SIDE == 0
@@ -37,11 +49,11 @@ const uint8_t keys = num_rows * num_cols;
   #if SIDE == 0
     const uint8_t rows[num_rows] = {13, 12, 11};
     const uint8_t cols[num_cols] = {PIN_A0, PIN_A1, PIN_A2, PIN_A3, PIN_A4, PIN_A5, PIN_SPI_SCK};
-    const uint8_t pipe = 1;
+    const uint8_t pipe = 3;
   #else
     const uint8_t rows[num_rows] = {13, 12, 11};
     const uint8_t cols[num_cols] = {PIN_A0, PIN_A1, PIN_A2, PIN_A3, PIN_A4, PIN_A5, PIN_SPI_SCK};
-    const uint8_t pipe = 2;
+    const uint8_t pipe = 4;
   #endif
 #endif
 
