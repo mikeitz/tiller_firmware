@@ -1,7 +1,7 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
 
-#define SIDE 1
+#define SIDE 0
 #define MARK 5
 const uint8_t debug = 0;
 
@@ -60,8 +60,8 @@ const uint8_t keys = num_rows * num_cols;
 const uint8_t delayPerTick = 2;
 const uint8_t debounceTicks = 2;
 
-const uint16_t sleepAfterIdleTicks = 1500/delayPerTick;
-const uint16_t repeatTransmitTicks = 400/delayPerTick;
+const uint16_t sleepAfterIdleTicks = 275/delayPerTick;
+const uint16_t repeatTransmitTicks = 50/delayPerTick;
 
 ///////////////////////////////////////////////////// MATRIX
 
@@ -213,9 +213,9 @@ void initCore() {
   sleeping = false;
   waking = true;
   nfcAsGpio();
-  NVIC_DisableIRQ(GPIOTE_IRQn);
-  NVIC_ClearPendingIRQ(GPIOTE_IRQn);
-  NVIC_SetPriority(GPIOTE_IRQn, 3);
+  // NVIC_DisableIRQ(GPIOTE_IRQn);
+  // NVIC_ClearPendingIRQ(GPIOTE_IRQn);
+  // NVIC_SetPriority(GPIOTE_IRQn, 3);
   NVIC_EnableIRQ(GPIOTE_IRQn);
   attachCustomInterruptHandler(wake);
 }
