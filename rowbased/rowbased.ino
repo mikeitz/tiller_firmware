@@ -60,8 +60,8 @@ const uint8_t keys = num_rows * num_cols;
 const uint8_t delayPerTick = 2;
 const uint8_t debounceTicks = 2;
 
-const uint16_t sleepAfterIdleTicks = 450/delayPerTick;
-const uint16_t repeatTransmitTicks = 100/delayPerTick;
+const uint16_t sleepAfterIdleTicks = 1500/delayPerTick;
+const uint16_t repeatTransmitTicks = 400/delayPerTick;
 
 ///////////////////////////////////////////////////// MATRIX
 
@@ -196,12 +196,10 @@ void sleep() {
   for (int c = 0; c < num_cols; ++c) {
     pinModeDetect(cols[c]);
   }
-  NVIC_EnableIRQ(GPIOTE_IRQn);
   suspendLoop();
 }
 
 void wake() {
-  NVIC_DisableIRQ(GPIOTE_IRQn);
   NRF_GPIOTE->EVENTS_PORT = 0;
   NRF_GPIOTE->INTENCLR |= GPIOTE_INTENSET_PORT_Msk;
   if (!sleeping) return;
@@ -216,7 +214,8 @@ void initCore() {
   nfcAsGpio();
   NVIC_DisableIRQ(GPIOTE_IRQn);
   NVIC_ClearPendingIRQ(GPIOTE_IRQn);
-  NVIC_SetPriority(GPIOTE_IRQn, 15);
+  NVIC_SetPriority(GPIOTE_IRQn, 3);
+  NVIC_EnableIRQ(GPIOTE_IRQn);
   attachCustomInterruptHandler(wake);
 }
 
