@@ -196,6 +196,7 @@ void sleep() {
   for (int c = 0; c < num_cols; ++c) {
     pinModeDetect(cols[c]);
   }
+  NVIC_EnableIRQ(GPIOTE_IRQn);
   suspendLoop();
 }
 
@@ -203,6 +204,8 @@ void wake() {
   NRF_GPIOTE->EVENTS_PORT = 0;
   NRF_GPIOTE->INTENCLR |= GPIOTE_INTENSET_PORT_Msk;
   if (!sleeping) return;
+  NVIC_DisableIRQ(GPIOTE_IRQn);
+  NVIC_ClearPendingIRQ(GPIOTE_IRQn);
   sleeping = false;
   waking = true;
   resumeLoop();
@@ -215,15 +218,21 @@ void initCore() {
   NVIC_DisableIRQ(GPIOTE_IRQn);
   NVIC_ClearPendingIRQ(GPIOTE_IRQn);
   NVIC_SetPriority(GPIOTE_IRQn, 3);
-  NVIC_EnableIRQ(GPIOTE_IRQn);
   attachCustomInterruptHandler(wake);
 }
 
 ///////////////////////////////////////////////////// RADIO
 
-uint8_t channel_table[3] = {4, 42, 77};
+#if SIDE == 0
+  uint8_t channel_table[3] = {25, 63, 33};
+#else
+  uint8_t channel_table[3] = {4, 42, 77};
+#endif
+
 uint8_t ack_payload[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 uint32_t ack_payload_length = 0;
+
+uint16_t outstanding_packets = 0;
 
 void initRadio() {
   nrf_gzll_init(NRF_GZLL_MODE_DEVICE);
@@ -238,8 +247,11 @@ void initRadio() {
 }
 
 void transmit() {
+  outstanding_packets++;
   uint32_t state = getState();
-  nrf_gzll_add_packet_to_tx_fifo(pipe, (uint8_t*)&state, 4);
+  if (!nrf_gzll_add_packet_to_tx_fifo(pipe, (uint8_t*)&state, 4)) {
+    outstanding_packets--;
+  }
 }
 
 void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
@@ -247,10 +259,14 @@ void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info
   if (tx_info.payload_received_in_ack) {
     nrf_gzll_fetch_packet_from_rx_fifo(pipe, ack_payload, &ack_payload_length);
   }
+  outstanding_packets--;
 }
-
-void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {}
-void nrf_gzll_disabled() {}
+void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
+  outstanding_packets--;
+}
+void nrf_gzll_disabled() {
+  outstanding_packets = 0;
+}
 void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {}
 
 ///////////////////////////////////////////////////// MAIN
@@ -298,7 +314,7 @@ void loop() {
 
   if (keysDown || debounceCount > 0) {
     ticksSinceActivity = 0;
-  } else if (ticksSinceActivity > sleepAfterIdleTicks) {
+  } else if (ticksSinceActivity > sleepAfterIdleTicks && outstanding_packets == 0) {
     if (debug) { Serial.println("sleep"); Serial.flush(); }
     sleep();
     return;
