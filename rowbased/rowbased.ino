@@ -194,13 +194,12 @@ void sleep() {
   for (int c = 0; c < num_cols; ++c) {
     pinModeDetect(cols[c]);
   }
-  attachCustomInterruptHandler(wake);
+  attachOneShotPortEventHandler(wake);
   suspendLoop();
 }
 
 void wake() {
   if (!sleeping) return;
-  detachCustomInterruptHandler();
   sleeping = false;
   waking = true;
   resumeLoop();
