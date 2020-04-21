@@ -191,21 +191,16 @@ void sleep() {
   for (int r = 0; r < num_rows; ++r) {
     digitalWrite(rows[r], LOW);
   }
-  NRF_GPIOTE->EVENTS_PORT = 0;
-  NRF_GPIOTE->INTENSET |= GPIOTE_INTENSET_PORT_Msk;
   for (int c = 0; c < num_cols; ++c) {
     pinModeDetect(cols[c]);
   }
-  NVIC_EnableIRQ(GPIOTE_IRQn);
+  attachCustomInterruptHandler(wake);
   suspendLoop();
 }
 
 void wake() {
-  NRF_GPIOTE->EVENTS_PORT = 0;
-  NRF_GPIOTE->INTENCLR |= GPIOTE_INTENSET_PORT_Msk;
   if (!sleeping) return;
-  NVIC_DisableIRQ(GPIOTE_IRQn);
-  NVIC_ClearPendingIRQ(GPIOTE_IRQn);
+  detachCustomInterruptHandler();
   sleeping = false;
   waking = true;
   resumeLoop();
@@ -215,10 +210,6 @@ void initCore() {
   sleeping = false;
   waking = true;
   nfcAsGpio();
-  NVIC_DisableIRQ(GPIOTE_IRQn);
-  NVIC_ClearPendingIRQ(GPIOTE_IRQn);
-  NVIC_SetPriority(GPIOTE_IRQn, 3);
-  attachCustomInterruptHandler(wake);
 }
 
 ///////////////////////////////////////////////////// RADIO
