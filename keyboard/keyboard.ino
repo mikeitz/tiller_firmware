@@ -60,8 +60,8 @@ const uint8_t keys = num_rows * num_cols;
 const uint8_t delayPerTick = 2;
 const uint8_t debounceTicks = 2;
 
-const uint16_t sleepAfterIdleTicks = 1500/delayPerTick;
-const uint16_t repeatTransmitTicks = 400/delayPerTick;
+const uint16_t sleepAfterIdleTicks = 500/delayPerTick;
+const uint16_t repeatTransmitTicks = 200/delayPerTick;
 
 ///////////////////////////////////////////////////// MATRIX
 
@@ -304,7 +304,7 @@ void loop() {
 
   if (keysDown || debounceCount > 0) {
     ticksSinceActivity = 0;
-  } else if (ticksSinceActivity > sleepAfterIdleTicks && outstanding_packets == 0) {
+  } else if (ticksSinceActivity > sleepAfterIdleTicks) {
     if (debug) { Serial.println("sleep"); Serial.flush(); }
     sleep();
     return;
