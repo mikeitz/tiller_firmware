@@ -58,7 +58,7 @@ const uint8_t keys = num_rows * num_cols;
 #endif
 
 const uint8_t delayPerTick = 2;
-const uint8_t debounceTicks = 2;
+const uint8_t debounceTicks = 3;
 
 const uint16_t sleepAfterIdleTicks = 500/delayPerTick;
 const uint16_t repeatTransmitTicks = 200/delayPerTick;
@@ -127,6 +127,7 @@ bool scanWithDebounce() {
   uint64_t scan;
   for (int r = 0; r < num_rows; ++r) {
     digitalWrite(rows[r], LOW);
+    __asm__("nop\n\tnop\n\tnop\n\tnop\n\tnop\n\t");
     ((uint32_t*)&scan)[0] = NRF_P0->IN;
     ((uint32_t*)&scan)[1] = NRF_P1->IN;
     digitalWrite(rows[r], HIGH);
