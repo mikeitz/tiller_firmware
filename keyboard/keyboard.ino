@@ -102,6 +102,8 @@ void initMatrix() {
   for (int c = 0; c < num_cols; ++c) {
     pinMode(cols[c], INPUT_PULLUP);
   }
+  // Prepare for read of first row.
+  digitalWrite(rows[0], LOW);
   debounceCount = 0;
   keysDown = false;
 }
@@ -126,11 +128,11 @@ bool scanWithDebounce() {
   bool anyKeys = false;
   uint64_t scan;
   for (int r = 0; r < num_rows; ++r) {
-    digitalWrite(rows[r], LOW);
-    __asm__("nop\n\tnop\n\tnop\n\tnop\n\tnop\n\t");
     ((uint32_t*)&scan)[0] = NRF_P0->IN;
     ((uint32_t*)&scan)[1] = NRF_P1->IN;
+    // Update rows off cycle to give pins time to settle.
     digitalWrite(rows[r], HIGH);
+    digitalWrite(rows[(r+1) % num_rows], LOW);
     scan = ~scan & colMask;
     scanToDebounceDiff = scanToDebounceDiff || (scan != debounceRows[r]);
     scanToStableDiff = scanToStableDiff || (scan != stableRows[r]);
@@ -234,6 +236,7 @@ void initRadio() {
   nrf_gzll_set_timeslot_period(900);
   nrf_gzll_set_base_address_0(0x01020304);
   nrf_gzll_set_base_address_1(0x05060708);
+  nrf_gzll_set_tx_power(NRF_GZLL_TX_POWER_4_DBM);
   nrf_gzll_enable();
 }
 
