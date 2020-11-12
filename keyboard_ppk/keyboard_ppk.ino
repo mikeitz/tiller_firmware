@@ -2,57 +2,27 @@
 #include "nrf_gzll.h"
 
 #define SIDE 0
-#define MARK 5
+#define MARK 1
 const uint8_t debug = 0;
 
 const uint8_t num_rows = 3;
 const uint8_t num_cols = 7;
 const uint8_t keys = num_rows * num_cols;
 
-#if MARK == 5
+#if MARK == 1
   #if SIDE == 0
-    const uint8_t rows[num_rows] = {PIN_A0, PIN_A3, PIN_SPI_SCK};
-    const uint8_t cols[num_cols] = {PIN_A1, PIN_A4, PIN_SPI_MOSI, PIN_A2, PIN_A5, PIN_SPI_MISO, PIN_NFC2};
-    const uint8_t pipe = 1;
-  #else
-    const uint8_t rows[num_rows] = {13, 10, 5};
-    const uint8_t cols[num_cols] = {PIN_NFC2, PIN_WIRE_SDA, 6, 11, PIN_WIRE_SCL, 9, 12};
-    const uint8_t pipe = 2;
-  #endif
-#endif
-
-#if MARK == 4
-  #if SIDE == 0
-    const uint8_t rows[num_rows] = {PIN_A3, PIN_A4, PIN_A5};
-    const uint8_t cols[num_cols] = {PIN_SPI_MISO, PIN_A2, PIN_SPI_MOSI, PIN_A1, PIN_SPI_SCK, PIN_A0, PIN_NFC2};
-    const uint8_t pipe = 1;
-  #else
-    const uint8_t rows[num_rows] = {10, 9, 6};
-    const uint8_t cols[num_cols] = {PIN_NFC2, 13, 5, 12, PIN_WIRE_SCL, 11, PIN_WIRE_SDA};
-    const uint8_t pipe = 2;
-  #endif
-#endif
-
-#if MARK == 3
-  #if SIDE == 0
-    const uint8_t rows[num_rows] = {13, 12, 11};
-    const uint8_t cols[num_cols] = {PIN_SPI_SCK, PIN_A5, PIN_A4, PIN_A3, PIN_A2, PIN_A1, PIN_A0};
+    const uint8_t pins[keys] = {
+      PIN_A5, PIN_A4, PIN_A3, PIN_A2, PIN_A1, PIN_A0, 11,
+      PIN_NFC2, PIN_SERIAL_TX, PIN_SERIAL_RX, PIN_SPI_MISO, PIN_SPI_MOSI, PIN_SPI_SCK, 12,
+      PIN_WIRE_SDA, PIN_WIRE_SCL, 5, 6, 9, 10, 13,
+    };
     const uint8_t pipe = 3;
   #else
-    const uint8_t rows[num_rows] = {13, 12, 11};
-    const uint8_t cols[num_cols] = {PIN_SPI_SCK, PIN_A5, PIN_A4, PIN_A3, PIN_A2, PIN_A1, PIN_A0};
-    const uint8_t pipe = 4;
-  #endif
-#endif
-
-#if MARK == 2
-  #if SIDE == 0
-    const uint8_t rows[num_rows] = {13, 12, 11};
-    const uint8_t cols[num_cols] = {PIN_A0, PIN_A1, PIN_A2, PIN_A3, PIN_A4, PIN_A5, PIN_SPI_SCK};
-    const uint8_t pipe = 3;
-  #else
-    const uint8_t rows[num_rows] = {13, 12, 11};
-    const uint8_t cols[num_cols] = {PIN_A0, PIN_A1, PIN_A2, PIN_A3, PIN_A4, PIN_A5, PIN_SPI_SCK};
+    const uint8_t pins[keys] = {
+      PIN_A5, PIN_A4, PIN_A3, PIN_A2, PIN_A1, PIN_A0, 11,
+      PIN_NFC2, PIN_SERIAL_TX, PIN_SERIAL_RX, PIN_SPI_MISO, PIN_SPI_MOSI, PIN_SPI_SCK, 12,
+      PIN_WIRE_SDA, PIN_WIRE_SCL, 5, 6, 9, 10, 13,
+    };
     const uint8_t pipe = 4;
   #endif
 #endif
@@ -68,42 +38,34 @@ const uint16_t repeatTransmitTicks = 200/delayPerTick;
 const uint64_t ONE = 1;
 uint64_t colMask; // Effectively const
 
-uint64_t stableRows[num_rows];
-uint64_t debounceRows[num_rows];
+uint64_t stablePins;
+uint64_t debouncePins;
 int debounceCount = 0;
 bool keysDown = false;
 
 void computeColMask() {
   colMask = 0;
-  for (int c = 0; c < num_cols; ++c) {
-    colMask |= ONE << g_ADigitalPinMap[cols[c]];
+  for (int p = 0; p < keys; ++p) {
+    colMask |= ONE << g_ADigitalPinMap[pins[p]];
   }
 }
 
 uint32_t getState() {
   uint32_t state = 0;
-  for (int r = 0; r < num_rows; ++r) {
-    for (int c = 0; c < num_cols; ++c) {
-      if (stableRows[r] & (ONE << g_ADigitalPinMap[cols[c]])) {
-        state |= ONE << (r * num_cols + c);
+  for (int p = 0; p < keys; ++p) {
+      if (stablePins & (ONE << g_ADigitalPinMap[pins[p]])) {
+        state |= ONE << (p);
       }
-    }
   }
   return state;
 }
 
 void initMatrix() {
-  for (int r = 0; r < num_rows; ++r) {
-    pinMode(rows[r], OUTPUT);
-    digitalWrite(rows[r], HIGH);
-    debounceRows[r] = 0;
-    stableRows[r] = 0;
+  for (int p = 0; p < keys; ++p) {
+    pinMode(pins[p], INPUT_PULLUP);
   }
-  for (int c = 0; c < num_cols; ++c) {
-    pinMode(cols[c], INPUT_PULLUP);
-  }
-  // Prepare for read of first row.
-  digitalWrite(rows[0], LOW);
+  debouncePins = 0;
+  stablePins = 0;
   debounceCount = 0;
   keysDown = false;
 }
@@ -123,20 +85,13 @@ void show(uint32_t x) {
 }
 
 bool scanWithDebounce() {
-  bool scanToDebounceDiff = false;
-  bool scanToStableDiff = false;
   uint64_t scan;
-  for (int r = 0; r < num_rows; ++r) {
-    ((uint32_t*)&scan)[0] = NRF_P0->IN;
-    ((uint32_t*)&scan)[1] = NRF_P1->IN;
-    // Update rows off cycle to give pins time to settle.
-    digitalWrite(rows[r], HIGH);
-    digitalWrite(rows[(r+1) % num_rows], LOW);
-    scan = ~scan & colMask;
-    scanToDebounceDiff = scanToDebounceDiff || (scan != debounceRows[r]);
-    scanToStableDiff = scanToStableDiff || (scan != stableRows[r]);
-    debounceRows[r] = scan;
-  }
+  ((uint32_t*)&scan)[0] = NRF_P0->IN;
+  ((uint32_t*)&scan)[1] = NRF_P1->IN;
+  scan = ~scan & colMask;
+  bool scanToDebounceDiff = scanToDebounceDiff || (scan != debouncePins);
+  bool scanToStableDiff = scanToStableDiff || (scan != stablePins);
+  debouncePins = scan;
   if (scanToDebounceDiff) {
     // Start/restart debouncing.
     debounceCount = debounceTicks;
@@ -152,11 +107,8 @@ bool scanWithDebounce() {
     return false;
   }
   // Finished debouncing and something changed.
-  keysDown = false;
-  for (int r = 0; r < num_rows; ++r) {
-    stableRows[r] = debounceRows[r];
-    keysDown = keysDown || (stableRows[r] != 0);
-  }
+  stablePins = debouncePins;
+  keysDown = stablePins != 0;
   return true;
 }
 
@@ -190,11 +142,8 @@ inline void pinModeDetect(uint32_t pin) {
 void sleep() {
   if (sleeping) return;
   sleeping = true;
-  for (int r = 0; r < num_rows; ++r) {
-    digitalWrite(rows[r], LOW);
-  }
-  for (int c = 0; c < num_cols; ++c) {
-    pinModeDetect(cols[c]);
+  for (int p = 0; p < keys; ++p) {
+    pinModeDetect(pins[p]);
   }
   attachOneShotPortEventHandler(wake);
   suspendLoop();
