@@ -3,22 +3,19 @@
 
 #define SIDE 0
 #define MARK 1
-const uint8_t debug = 0;
-
-const uint8_t num_rows = 3;
-const uint8_t num_cols = 7;
-const uint8_t keys = num_rows * num_cols;
+const uint8_t debug = 1;
+const uint8_t num_keys = 21;
 
 #if MARK == 1
   #if SIDE == 0
-    const uint8_t pins[keys] = {
+    const uint8_t pins[num_keys] = {
       PIN_A5, PIN_A4, PIN_A3, PIN_A2, PIN_A1, PIN_A0, 11,
       PIN_NFC2, PIN_SERIAL_TX, PIN_SERIAL_RX, PIN_SPI_MISO, PIN_SPI_MOSI, PIN_SPI_SCK, 12,
       PIN_WIRE_SDA, PIN_WIRE_SCL, 5, 6, 9, 10, 13,
     };
     const uint8_t pipe = 3;
   #else
-    const uint8_t pins[keys] = {
+    const uint8_t pins[num_keys] = {
       PIN_A2, 13, 10, 6, PIN_A5, PIN_SPI_MISO, PIN_NFC2,
       PIN_A1, 11, 9, 5, PIN_A4, PIN_SPI_MOSI, PIN_SERIAL_TX,
       PIN_A0, 12, PIN_WIRE_SDA, PIN_WIRE_SCL, PIN_A3, PIN_SPI_SCK, PIN_SERIAL_RX,
@@ -38,21 +35,21 @@ const uint16_t repeatTransmitTicks = 200/delayPerTick;
 const uint64_t ONE = 1;
 uint64_t colMask; // Effectively const
 
-uint64_t stablePins;
-uint64_t debouncePins;
+uint64_t stablePins = 0;
+uint64_t debouncePins = 0;
 int debounceCount = 0;
 bool keysDown = false;
 
 void computeColMask() {
   colMask = 0;
-  for (int p = 0; p < keys; ++p) {
+  for (int p = 0; p < num_keys; ++p) {
     colMask |= ONE << g_ADigitalPinMap[pins[p]];
   }
 }
 
 uint32_t getState() {
   uint32_t state = 0;
-  for (int p = 0; p < keys; ++p) {
+  for (int p = 0; p < num_keys; ++p) {
       if (stablePins & (ONE << g_ADigitalPinMap[pins[p]])) {
         state |= ONE << (p);
       }
@@ -61,7 +58,7 @@ uint32_t getState() {
 }
 
 void initMatrix() {
-  for (int p = 0; p < keys; ++p) {
+  for (int p = 0; p < num_keys; ++p) {
     pinMode(pins[p], INPUT_PULLUP);
   }
   debouncePins = 0;
@@ -142,7 +139,7 @@ inline void pinModeDetect(uint32_t pin) {
 void sleep() {
   if (sleeping) return;
   sleeping = true;
-  for (int p = 0; p < keys; ++p) {
+  for (int p = 0; p < num_keys; ++p) {
     pinModeDetect(pins[p]);
   }
   attachOneShotPortEventHandler(wake);
@@ -259,7 +256,6 @@ void loop() {
   } else if (ticksSinceActivity > sleepAfterIdleTicks) {
     if (debug) { Serial.println("sleep"); Serial.flush(); }
     sleep();
-    return;
   } else {
     ticksSinceActivity++;
   }
