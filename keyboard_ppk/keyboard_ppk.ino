@@ -3,7 +3,7 @@
 
 #define SIDE 0
 #define MARK 1
-const uint8_t debug = 1;
+const uint8_t debug = 0;
 const uint8_t num_keys = 21;
 
 #if MARK == 1
@@ -26,9 +26,6 @@ const uint8_t num_keys = 21;
 
 const uint8_t delayPerTick = 2;
 const uint8_t debounceTicks = 3;
-
-const uint16_t sleepAfterIdleTicks = 500/delayPerTick;
-const uint16_t repeatTransmitTicks = 200/delayPerTick;
 
 ///////////////////////////////////////////////////// MATRIX
 
@@ -61,9 +58,7 @@ void initMatrix() {
   for (int p = 0; p < num_keys; ++p) {
     pinMode(pins[p], INPUT_PULLUP);
   }
-  debouncePins = 0;
-  stablePins = 0;
-  debounceCount = 0;
+  debounceCount = debounceTicks;
   keysDown = false;
 }
 
@@ -81,7 +76,11 @@ void show(uint32_t x) {
   Serial.println();
 }
 
-bool scanWithDebounce() {
+#define CONTINUE 0
+#define TRANSMIT 1
+#define SLEEP 2
+
+uint8_t scanWithDebounce() {
   uint64_t scan;
   ((uint32_t*)&scan)[0] = NRF_P0->IN;
   ((uint32_t*)&scan)[1] = NRF_P1->IN;
@@ -92,21 +91,21 @@ bool scanWithDebounce() {
   if (scanToDebounceDiff) {
     // Start/restart debouncing.
     debounceCount = debounceTicks;
-    return false;
+    return CONTINUE;
   }
   if (debounceCount > 0) {
     // Holding steady, no new bounces.
     debounceCount--;
-    return false;
+    return CONTINUE;
   }
   if (!scanToStableDiff) {
     // Finished debouncing but no keys changed.
-    return false;
+    return SLEEP;
   }
   // Finished debouncing and something changed.
   stablePins = debouncePins;
   keysDown = stablePins != 0;
-  return true;
+  return TRANSMIT;
 }
 
 ///////////////////////////////////////////////////// CORE
@@ -128,12 +127,15 @@ void nfcAsGpio() {
 
 inline void pinModeDetect(uint32_t pin) {
   pin = g_ADigitalPinMap[pin];
+  uint32_t sense = (stablePins & (ONE << pin)) ?
+    GPIO_PIN_CNF_SENSE_High :
+    GPIO_PIN_CNF_SENSE_Low;
   NRF_GPIO_Type * port = nrf_gpio_pin_port_decode(&pin);
   port->PIN_CNF[pin] = ((uint32_t)GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
                        | ((uint32_t)GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos)
                        | ((uint32_t)GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos)
                        | ((uint32_t)GPIO_PIN_CNF_DRIVE_S0S1 << GPIO_PIN_CNF_DRIVE_Pos)
-                       | ((uint32_t)GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
+                       | (sense << GPIO_PIN_CNF_SENSE_Pos);
 }
 
 void sleep() {
@@ -150,6 +152,7 @@ void wake() {
   if (!sleeping) return;
   sleeping = false;
   waking = true;
+  debounceCount = debounceTicks;
   resumeLoop();
 }
 
@@ -210,9 +213,6 @@ void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
 
 ///////////////////////////////////////////////////// MAIN
 
-uint16_t ticksSinceActivity = 0;
-uint16_t ticksSinceTransmit = 0;
-
 void setup() {
   if (debug) {
     Serial.begin(115200);
@@ -235,28 +235,17 @@ void loop() {
       Serial.end();
     }
     initMatrix();
-    ticksSinceActivity = 0;
-    ticksSinceTransmit = 0;
   }
 
-  if (scanWithDebounce()) {
+  uint8_t verdict = scanWithDebounce();
+  if (verdict == TRANSMIT) {
     if (debug) { show(getState()); Serial.flush(); }
     transmit();
-    ticksSinceTransmit = 0;
-  } else if (ticksSinceTransmit > repeatTransmitTicks) {
-    if (debug) { Serial.println("xmit"); Serial.flush(); }
-    transmit();
-    ticksSinceTransmit = 0;
-  } else {
-    ticksSinceTransmit++;
-  }
-
-  if (keysDown || debounceCount > 0) {
-    ticksSinceActivity = 0;
-  } else if (ticksSinceActivity > sleepAfterIdleTicks) {
+    sleep();
+  } else if (verdict == CONTINUE) {
+    return;
+  } else if (verdict == SLEEP) {
     if (debug) { Serial.println("sleep"); Serial.flush(); }
     sleep();
-  } else {
-    ticksSinceActivity++;
   }
 }
