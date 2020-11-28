@@ -1,21 +1,20 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
+
 #define SIDE 0
 #define MARK 1
 const uint8_t debug = 0;
 
 const uint8_t num_rows = 3;
 const uint8_t num_cols = 7;
+const uint8_t num_extra = 3;
 const uint8_t keys = num_rows * num_cols;
-
-#define PIN_D2 2
 
 #if MARK == 1
   #if SIDE == 0
     const uint8_t pipe = 1;
     const uint8_t rows[num_rows] = {9, PIN_SERIAL1_TX, PIN_SPI_MOSI};
     const uint8_t cols[num_cols] = {PIN_SPI_MISO, PIN_SPI_SCK, PIN_WIRE_SCL, 10, 12, 13, PIN_A4 /* DUMMY */};
-    const uint8_t num_extra = 3;
     const uint8_t extra_rows[num_extra] = {0, 1, 2};
     const uint8_t extra_cols[num_extra] = {6, 6, 6};
     const uint8_t extra_pins[num_extra] = {PIN_A0, PIN_A1, PIN_A2};
@@ -23,7 +22,6 @@ const uint8_t keys = num_rows * num_cols;
     const uint8_t pipe = 2;
     const uint8_t rows[num_rows] = {PIN_SPI_SCK, 7, PIN_SERIAL1_RX};
     const uint8_t cols[num_cols] = {PIN_A4 /* DUMMY */, PIN_A0, PIN_A1, PIN_A2, PIN_A5, PIN_SPI_MOSI, PIN_SERIAL1_TX};
-    const uint8_t num_extra = 3;
     const uint8_t extra_rows[num_extra] = {0, 1, 2};
     const uint8_t extra_cols[num_extra] = {0, 0, 0};
     const uint8_t extra_pins[num_extra] = {11, 12, 13};
@@ -32,8 +30,8 @@ const uint8_t keys = num_rows * num_cols;
 
 const uint8_t delay_per_tick = 2;
 const uint8_t debounce_ticks = 2;
-
 const uint16_t repeat_transmit_ticks = 500/delay_per_tick;
+const uint8_t max_resends = 10;
 
 ///////////////////////////////////////////////////// MATRIX
 
@@ -45,7 +43,7 @@ uint64_t stable_rows[num_rows];
 uint64_t debounce_rows[num_rows];
 uint64_t stable_extra;
 uint64_t debounce_extra;
-int debounce_count = 0;
+uint8_t debounce_count = 0;
 
 void computeColMask() {
   col_mask = 0;
@@ -199,17 +197,15 @@ void initCore() {
 
 ///////////////////////////////////////////////////// RADIO
 
-#if SIDE == 0
-  uint8_t channel_table[3] = {25, 63, 33};
-#else
-  uint8_t channel_table[3] = {4, 42, 77};
-#endif
-
 uint8_t outstanding_packets = 0;
 uint8_t resends = 0;
-const uint8_t max_resends = 10;
 
 void initRadio() {
+  #if SIDE == 0
+    static uint8_t channel_table[3] = {25, 63, 33};
+  #else
+    static uint8_t channel_table[3] = {4, 42, 77};
+  #endif
   delay(1000);
   nrf_gzll_init(NRF_GZLL_MODE_DEVICE);
   nrf_gzll_set_max_tx_attempts(100);
