@@ -1,6 +1,6 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
-#define SIDE 1
+#define SIDE 0
 #define MARK 1
 const uint8_t debug = 0;
 
@@ -15,48 +15,46 @@ const uint8_t keys = num_rows * num_cols;
     const uint8_t pipe = 1;
     const uint8_t rows[num_rows] = {9, PIN_SERIAL1_TX, PIN_SPI_MOSI};
     const uint8_t cols[num_cols] = {PIN_SPI_MISO, PIN_SPI_SCK, PIN_WIRE_SCL, 10, 12, 13, PIN_A4 /* DUMMY */};
-    const uint8_t numExtra = 3;
-    const uint8_t extraRows[numExtra] = {0, 1, 2};
-    const uint8_t extraCols[numExtra] = {6, 6, 6};
-    const uint8_t extraPins[numExtra] = {PIN_A0, PIN_A1, PIN_A2};
+    const uint8_t num_extra = 3;
+    const uint8_t extra_rows[num_extra] = {0, 1, 2};
+    const uint8_t extra_cols[num_extra] = {6, 6, 6};
+    const uint8_t extra_pins[num_extra] = {PIN_A0, PIN_A1, PIN_A2};
   #else
     const uint8_t pipe = 2;
     const uint8_t rows[num_rows] = {PIN_SPI_SCK, 7, PIN_SERIAL1_RX};
     const uint8_t cols[num_cols] = {PIN_A4 /* DUMMY */, PIN_A0, PIN_A1, PIN_A2, PIN_A5, PIN_SPI_MOSI, PIN_SERIAL1_TX};
-    const uint8_t numExtra = 3;
-    const uint8_t extraRows[numExtra] = {0, 1, 2};
-    const uint8_t extraCols[numExtra] = {0, 0, 0};
-    const uint8_t extraPins[numExtra] = {11, 12, 13};
+    const uint8_t num_extra = 3;
+    const uint8_t extra_rows[num_extra] = {0, 1, 2};
+    const uint8_t extra_cols[num_extra] = {0, 0, 0};
+    const uint8_t extra_pins[num_extra] = {11, 12, 13};
   #endif
 #endif
 
-const uint8_t delayPerTick = 2;
-const uint8_t debounceTicks = 3;
+const uint8_t delay_per_tick = 2;
+const uint8_t debounce_ticks = 2;
 
-const uint16_t sleepAfterIdleTicks = 500/delayPerTick;
-const uint16_t repeatTransmitTicks = 200/delayPerTick;
+const uint16_t repeat_transmit_ticks = 500/delay_per_tick;
 
 ///////////////////////////////////////////////////// MATRIX
 
 const uint64_t ONE = 1;
-uint64_t colMask; // Effectively const
-uint64_t extraMask; // Effectively const;
+uint64_t col_mask; // Effectively const
+uint64_t extra_mask; // Effectively const;
 
-uint64_t stableRows[num_rows];
-uint64_t debounceRows[num_rows];
-uint64_t stableExtra;
-uint64_t debounceExtra;
-int debounceCount = 0;
-bool keysDown = false;
+uint64_t stable_rows[num_rows];
+uint64_t debounce_rows[num_rows];
+uint64_t stable_extra;
+uint64_t debounce_extra;
+int debounce_count = 0;
 
 void computeColMask() {
-  colMask = 0;
+  col_mask = 0;
   for (int c = 0; c < num_cols; ++c) {
-    colMask |= ONE << g_ADigitalPinMap[cols[c]];
+    col_mask |= ONE << g_ADigitalPinMap[cols[c]];
   }
-  extraMask = 0;
-  for (int i = 0; i < numExtra; ++i) {
-    extraMask |= ONE << g_ADigitalPinMap[extraPins[i]];
+  extra_mask = 0;
+  for (int i = 0; i < num_extra; ++i) {
+    extra_mask |= ONE << g_ADigitalPinMap[extra_pins[i]];
   }
 }
 
@@ -64,14 +62,14 @@ uint32_t getState() {
   uint32_t state = 0;
   for (int r = 0; r < num_rows; ++r) {
     for (int c = 0; c < num_cols; ++c) {
-      if (stableRows[r] & (ONE << g_ADigitalPinMap[cols[c]])) {
+      if (stable_rows[r] & (ONE << g_ADigitalPinMap[cols[c]])) {
         state |= ONE << (r * num_cols + c);
       }
     }
   }
-  for (int i = 0; i < numExtra; ++i) {
-    if (stableExtra & (ONE << g_ADigitalPinMap[extraPins[i]])) {
-      state |= ONE << (extraRows[i] * num_cols + extraCols[i]);
+  for (int i = 0; i < num_extra; ++i) {
+    if (stable_extra & (ONE << g_ADigitalPinMap[extra_pins[i]])) {
+      state |= ONE << (extra_rows[i] * num_cols + extra_cols[i]);
     }
   }
   return state;
@@ -81,19 +79,15 @@ void initMatrix() {
   for (int r = 0; r < num_rows; ++r) {
     pinMode(rows[r], OUTPUT);
     digitalWrite(rows[r], HIGH);
-    debounceRows[r] = 0;
-    stableRows[r] = 0;
-  }
-  for (int c = 0; c < num_cols; ++c) {
-    pinMode(cols[c], INPUT_PULLUP);
-  }
-  for (int i = 0; i < numExtra; ++i) {
-    pinMode(extraPins[i], INPUT_PULLUP);
+    debounce_rows[r] = 0;
+    stable_rows[r] = 0;
   }
   // Prepare for read of first row.
   digitalWrite(rows[0], LOW);
-  debounceCount = 0;
-  keysDown = false;
+  // Since we woke up, assume we're bouncing against idle.
+  debounce_count = debounce_ticks;
+  debounce_extra = 0;
+  stable_extra = 0;
 }
 
 void show(uint64_t x) {
@@ -110,11 +104,15 @@ void show(uint32_t x) {
   Serial.println();
 }
 
-bool scanWithDebounce() {
-  bool scanToDebounceDiff = false;
-  bool scanToStableDiff = false;
+#define BOUNCING 1
+#define CHANGED 2
+#define ACTIVE 4
+
+uint8_t scanWithDebounce() {
+  bool scan_to_debounce_diff = false;
+  bool scan_to_stable_diff = false;
   uint64_t scan;
-  uint64_t maskedRow;
+  uint64_t masked_row;
   for (int r = 0; r < num_rows; ++r) {
     ((uint32_t*)&scan)[0] = NRF_P0->IN;
     ((uint32_t*)&scan)[1] = NRF_P1->IN;
@@ -122,43 +120,41 @@ bool scanWithDebounce() {
     digitalWrite(rows[r], HIGH);
     digitalWrite(rows[(r+1) % num_rows], LOW);
     scan = ~scan;
-    maskedRow = scan & colMask;
-    scanToDebounceDiff = scanToDebounceDiff || (maskedRow != debounceRows[r]);
-    scanToStableDiff = scanToStableDiff || (maskedRow != stableRows[r]);
-    debounceRows[r] = maskedRow;
+    masked_row = scan & col_mask;
+    scan_to_debounce_diff = scan_to_debounce_diff || (masked_row != debounce_rows[r]);
+    scan_to_stable_diff = scan_to_stable_diff || (masked_row != stable_rows[r]);
+    debounce_rows[r] = masked_row;
   }
-  uint64_t maskedExtra = scan & extraMask;
-  scanToDebounceDiff = scanToDebounceDiff || (maskedExtra != debounceExtra);
-  scanToStableDiff = scanToStableDiff || (maskedExtra != stableExtra);
-  debounceExtra = maskedExtra;
-  if (scanToDebounceDiff) {
+  uint64_t maskedExtra = scan & extra_mask;
+  scan_to_debounce_diff = scan_to_debounce_diff || (maskedExtra != debounce_extra);
+  scan_to_stable_diff = scan_to_stable_diff || (maskedExtra != stable_extra);
+  debounce_extra = maskedExtra;
+
+  if (scan_to_debounce_diff) {
     // Start/restart debouncing.
-    debounceCount = debounceTicks;
-    return false;
-  }
-  if (debounceCount > 0) {
+    debounce_count = debounce_ticks;
+    return BOUNCING;
+  } else if (debounce_count > 0) {
     // Holding steady, no new bounces.
-    debounceCount--;
-    return false;
+    debounce_count--;
+    return BOUNCING;
   }
-  if (!scanToStableDiff) {
-    // Finished debouncing but no keys changed.
-    return false;
-  }
-  // Finished debouncing and something changed.
-  stableExtra = debounceExtra;
-  keysDown = stableExtra != 0;
+
+  stable_extra = debounce_extra;
+  bool keys_down = stable_extra != 0;
   for (int r = 0; r < num_rows; ++r) {
-    stableRows[r] = debounceRows[r];
-    keysDown = keysDown || (stableRows[r] != 0);
+    stable_rows[r] = debounce_rows[r];
+    keys_down = keys_down || (stable_rows[r] != 0);
   }
-  return true;
+
+  return (scan_to_stable_diff ? CHANGED : 0) | (keys_down ? ACTIVE : 0);
 }
 
 ///////////////////////////////////////////////////// CORE
 
 volatile bool sleeping = false;
 volatile bool waking = true;
+volatile bool force_resend = false;
 
 void nfcAsGpio() {
   if ((NRF_UICR->NFCPINS & UICR_NFCPINS_PROTECT_Msk) == (UICR_NFCPINS_PROTECT_NFC << UICR_NFCPINS_PROTECT_Pos)){
@@ -172,27 +168,11 @@ void nfcAsGpio() {
   }
 }
 
-inline void pinModeDetect(uint32_t pin) {
-  pin = g_ADigitalPinMap[pin];
-  NRF_GPIO_Type * port = nrf_gpio_pin_port_decode(&pin);
-  port->PIN_CNF[pin] = ((uint32_t)GPIO_PIN_CNF_DIR_Input << GPIO_PIN_CNF_DIR_Pos)
-                       | ((uint32_t)GPIO_PIN_CNF_INPUT_Connect << GPIO_PIN_CNF_INPUT_Pos)
-                       | ((uint32_t)GPIO_PIN_CNF_PULL_Pullup << GPIO_PIN_CNF_PULL_Pos)
-                       | ((uint32_t)GPIO_PIN_CNF_DRIVE_S0S1 << GPIO_PIN_CNF_DRIVE_Pos)
-                       | ((uint32_t)GPIO_PIN_CNF_SENSE_Low << GPIO_PIN_CNF_SENSE_Pos);
-}
-
 void sleep() {
   if (sleeping) return;
   sleeping = true;
   for (int r = 0; r < num_rows; ++r) {
     digitalWrite(rows[r], LOW);
-  }
-  for (int c = 0; c < num_cols; ++c) {
-    pinModeDetect(cols[c]);
-  }
-  for (int i = 0; i < numExtra; ++i) {
-    pinModeDetect(extraPins[i]);
   }
   attachOneShotPortEventHandler(wake);
   suspendLoop();
@@ -209,6 +189,12 @@ void initCore() {
   sleeping = false;
   waking = true;
   nfcAsGpio();
+  for (int c = 0; c < num_cols; ++c) {
+    pinMode(cols[c], INPUT_PULLUP_SENSE);
+  }
+  for (int i = 0; i < num_extra; ++i) {
+    pinMode(extra_pins[i], INPUT_PULLUP_SENSE);
+  }
 }
 
 ///////////////////////////////////////////////////// RADIO
@@ -219,10 +205,9 @@ void initCore() {
   uint8_t channel_table[3] = {4, 42, 77};
 #endif
 
-uint8_t ack_payload[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
-uint32_t ack_payload_length = 0;
-
-uint16_t outstanding_packets = 0;
+uint8_t outstanding_packets = 0;
+uint8_t resends = 0;
+const uint8_t max_resends = 10;
 
 void initRadio() {
   delay(1000);
@@ -247,13 +232,19 @@ void transmit() {
 }
 
 void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
+  static uint8_t ack_payload[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
   uint32_t ack_payload_length = NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH;
   if (tx_info.payload_received_in_ack) {
     nrf_gzll_fetch_packet_from_rx_fifo(pipe, ack_payload, &ack_payload_length);
   }
+  resends = 0;
   outstanding_packets--;
 }
 void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
+  if (outstanding_packets == 0 && resends < max_resends) {
+    resends++;
+    force_resend = true;
+  }
   outstanding_packets--;
 }
 void nrf_gzll_disabled() {
@@ -262,9 +253,6 @@ void nrf_gzll_disabled() {
 void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {}
 
 ///////////////////////////////////////////////////// MAIN
-
-uint16_t ticksSinceActivity = 0;
-uint16_t ticksSinceTransmit = 0;
 
 void setup() {
   if (debug) {
@@ -276,7 +264,10 @@ void setup() {
 }
 
 void loop() {
-  delay(delayPerTick);
+
+  static uint16_t ticks_since_transmit = 0;
+
+  delay(delay_per_tick);
   if (sleeping) {
     return;
   }
@@ -288,29 +279,36 @@ void loop() {
       Serial.end();
     }
     initMatrix();
-    ticksSinceActivity = 0;
-    ticksSinceTransmit = 0;
+    ticks_since_transmit = 0;
   }
 
-  if (scanWithDebounce()) {
-    if (debug) { show(getState()); Serial.flush(); }
-    transmit();
-    ticksSinceTransmit = 0;
-  } else if (ticksSinceTransmit > repeatTransmitTicks) {
-    if (debug) { Serial.println("xmit"); Serial.flush(); }
-    transmit();
-    ticksSinceTransmit = 0;
-  } else {
-    ticksSinceTransmit++;
-  }
+  const uint8_t verdict = scanWithDebounce();
 
-  if (keysDown || debounceCount > 0) {
-    ticksSinceActivity = 0;
-  } else if (ticksSinceActivity > sleepAfterIdleTicks) {
-    if (debug) { Serial.println("sleep"); Serial.flush(); }
-    sleep();
+  if (verdict & BOUNCING) {
     return;
-  } else {
-    ticksSinceActivity++;
+  }
+
+  if ((verdict & CHANGED) || force_resend) {
+    if (debug) {
+      if (force_resend) { Serial.print("! "); }
+      show(getState());
+      Serial.flush();
+    }
+    force_resend = false;
+    ticks_since_transmit = 0;
+    transmit();
+  } else if (verdict & ACTIVE) {
+    if (ticks_since_transmit > repeat_transmit_ticks) {
+      if (debug) { Serial.println("xmit"); Serial.flush(); }
+      transmit();
+      ticks_since_transmit = 0;
+    } else {
+      ticks_since_transmit++;
+    }
+  }
+
+  // If no keys are down and the last packet we sent was acked, sleep.
+  if (!(verdict & ACTIVE) && outstanding_packets == 0) {
+    sleep();
   }
 }
