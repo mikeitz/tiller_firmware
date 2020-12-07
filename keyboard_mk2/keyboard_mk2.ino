@@ -30,8 +30,8 @@ const uint8_t keys = num_rows * num_cols;
 
 const uint8_t delay_per_tick = 2;
 const uint8_t debounce_ticks = 2;
-const uint16_t repeat_transmit_ticks = 500/delay_per_tick;
-const uint8_t max_resends = 10;
+const uint16_t repeat_transmit_ticks = 5000/delay_per_tick;
+const uint16_t max_resends = 1000/delay_per_tick;
 
 ///////////////////////////////////////////////////// MATRIX
 
@@ -153,6 +153,7 @@ uint8_t scanWithDebounce() {
 volatile bool sleeping = false;
 volatile bool waking = true;
 volatile bool force_resend = false;
+volatile uint8_t outstanding_packets = 0;
 
 void nfcAsGpio() {
   if ((NRF_UICR->NFCPINS & UICR_NFCPINS_PROTECT_Msk) == (UICR_NFCPINS_PROTECT_NFC << UICR_NFCPINS_PROTECT_Pos)){
@@ -197,7 +198,6 @@ void initCore() {
 
 ///////////////////////////////////////////////////// RADIO
 
-uint8_t outstanding_packets = 0;
 uint8_t resends = 0;
 
 void initRadio() {
@@ -304,7 +304,8 @@ void loop() {
   }
 
   // If no keys are down and the last packet we sent was acked, sleep.
-  if (!(verdict & ACTIVE) && outstanding_packets == 0) {
+  if (!(verdict & ACTIVE) && outstanding_packets == 0 && !force_resend) {
+    if (debug) { Serial.println("sleep"); Serial.flush(); }
     sleep();
   }
 }
