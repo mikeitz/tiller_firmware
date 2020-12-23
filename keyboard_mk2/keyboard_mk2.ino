@@ -18,6 +18,7 @@ const uint8_t keys = num_rows * num_cols;
     const uint8_t extra_rows[num_extra] = {0, 1, 2};
     const uint8_t extra_cols[num_extra] = {6, 6, 6};
     const uint8_t extra_pins[num_extra] = {PIN_A0, PIN_A1, PIN_A2};
+    const uint8_t extra_ground = PIN_A3;
   #else
     const uint8_t pipe = 2;
     const uint8_t rows[num_rows] = {PIN_SPI_SCK, 7, PIN_SERIAL1_RX};
@@ -25,6 +26,7 @@ const uint8_t keys = num_rows * num_cols;
     const uint8_t extra_rows[num_extra] = {0, 1, 2};
     const uint8_t extra_cols[num_extra] = {0, 0, 0};
     const uint8_t extra_pins[num_extra] = {11, 12, 13};
+    const uint8_t extra_ground = 10;
   #endif
 #endif
 
@@ -187,6 +189,8 @@ void wake() {
 void initCore() {
   sleeping = false;
   waking = true;
+  pinMode(extra_ground, OUTPUT);
+  digitalWrite(extra_ground, 0);
   nfcAsGpio();
   for (int c = 0; c < num_cols; ++c) {
     pinMode(cols[c], INPUT_PULLUP_SENSE);
