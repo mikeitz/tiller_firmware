@@ -10,7 +10,7 @@ const uint8_t num_cols = 7;
 const uint8_t num_extra = 3;
 const uint8_t keys = num_rows * num_cols;
 
-#if MARK == 1
+#if MARK == 1 // Row/col based printed one-piece rechargeable board.
   #if SIDE == 0
     const uint8_t pipe = 1;
     const uint8_t rows[num_rows] = {9, PIN_SERIAL1_TX, PIN_SPI_MOSI};
