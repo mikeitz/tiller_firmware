@@ -82,6 +82,8 @@ uint32_t reports_generated = 0, reports_sent = 0;
 const int report_buffer_size = 256;
 const int report_size = 7;
 uint8_t report_buffer[report_buffer_size * report_size];
+int8_t mods = 0, per_key_mods = 0;
+uint8_t report[6] = { 0, 0, 0, 0, 0, 0 };
 
 void initHid() {
   usb_hid.setReportCallback(NULL, hid_report_callback);
@@ -90,9 +92,6 @@ void initHid() {
     delay(1);
   }
 }
-
-int8_t mods = 0, weak_mods = 0;
-uint8_t report[6] = { 0, 0, 0, 0, 0, 0 };
 
 void addToReport(uint8_t keycode) {
   clearFromReport(keycode);
@@ -114,7 +113,7 @@ void clearFromReport(uint8_t keycode) {
 
 void generateReport() {
   uint8_t* report_ptr = &report_buffer[(reports_generated * report_size) % report_buffer_size];
-  report_ptr[0] = mods | weak_mods;
+  report_ptr[0] = mods | per_key_mods;
   memcpy(report_ptr + 1, report, 6);
   ++reports_generated;
 }
@@ -131,10 +130,11 @@ bool sendReports() {
   return true;
 }
 
-///////////////////////////////////////// KEYBOARD
+///////////////////////////////////////// KEYMAP
 
 #define TG(layer) HID_KEY_SPACE
 #define LM(mod, layer) HID_KEY_SPACE
+#define S(key) key
 
 #define LAYER_BASE 0
 #define LAYER_TAB 1
@@ -148,26 +148,41 @@ const int num_layers = 16;
 const int keys_per_pipe = 32;
 
 #define ___ 0
-#define XXX -1
+#define XXX 0
 
 const uint32_t keymap[num_pipes][num_layers][keys_per_pipe] = {
   { // PIPE 0
   },
   { // PIPE 1
     { // LAYER_BASE
-     HID_KEY_ESCAPE, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, HID_KEY_GUI_LEFT,
+     HID_KEY_TAB, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, HID_KEY_GUI_LEFT,
      LM(HID_KEY_CONTROL_LEFT, LAYER_TAB), HID_KEY_A, HID_KEY_S, HID_KEY_D, HID_KEY_F, HID_KEY_G, HID_KEY_SHIFT_LEFT,
      LM(HID_KEY_ALT_LEFT, LAYER_TAB), HID_KEY_Z, HID_KEY_X, HID_KEY_C, HID_KEY_V, HID_KEY_B, TG(LAYER_NUM),
     },
     { // LAYER_TAB
+      HID_KEY_F4, ___, ___, ___, ___, ___, S(HID_KEY_TAB),
+      ___, ___, ___, ___, ___, ___, ___,
+      ___, ___, ___, ___, ___, ___, HID_KEY_TAB,
     },
     { // LAYER_GAME
+      ___, ___, ___, ___, ___, ___, ___,
+      ___, ___, ___, ___, ___, ___, ___,
+      ___, ___, ___, ___, ___, ___, ___,
     },
     { // LAYER_NUM
+      HID_KEY_ESCAPE, XXX, XXX, XXX, XXX, XXX, ___,
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
     },
     { // LAYER_SYM
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
     },
     { // LAYER_FN
+      XXX, XXX, XXX, XXX, XXX, XXX, ___,
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
+      ___, XXX, XXX, XXX, XXX, XXX, XXX,
     },
   },
   { // PIPE 2
@@ -177,24 +192,41 @@ const uint32_t keymap[num_pipes][num_layers][keys_per_pipe] = {
      TG(LAYER_FN), HID_KEY_N, HID_KEY_M, HID_KEY_COMMA, HID_KEY_PERIOD, HID_KEY_SLASH, HID_KEY_DELETE,
     },
     { // LAYER_TAB
+      ___, ___, ___, ___, ___, ___, ___,
+      ___, ___, ___, ___, ___, ___, ___,
+      ___, ___, ___, ___, ___, ___, ___,
     },
     { // LAYER_GAME
+      ___, ___, ___, ___, ___, ___, ___,
+      ___, ___, ___, ___, ___, ___, ___,
+      ___, ___, ___, ___, ___, ___, ___,
     },
     { // LAYER_NUM
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
     },
     { // LAYER_SYM
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
     },
     { // LAYER_FN
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
+      ___, XXX, XXX, XXX, XXX, XXX, ___,
     },
   },
 };
+
+///////////////////////////////////////// KEYBOARD
 
 uint32_t release_keymap[num_pipes][keys_per_pipe];
 int32_t pipe_state[num_pipes] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
 void handleKey(uint8_t pipe, uint8_t key, bool pressed) {
   if (pressed) {
-    weak_mods = 0;
+    per_key_mods = 0;
     uint8_t keycode = (uint8_t)keymap[pipe][LAYER_BASE][key];
     release_keymap[pipe][key] = keycode;
     addToReport(keycode);
@@ -217,6 +249,10 @@ void updatePipe(uint8_t pipe, uint32_t new_state) {
       }
     }
   }
+  if (per_key_mods) {
+    per_key_mods = 0;
+    generateReport();
+  }
   pipe_state[pipe] = new_state;
 }
 
@@ -230,25 +266,21 @@ void setup() {
 }
 
 void loop() {
+  delay(1);
+
   if (hasMessage() && TinyUSBDevice.suspended()) {
     TinyUSBDevice.remoteWakeup();
   }
 
-  // Send all existing reports.
   if (!sendReports()) {
-    delay(1);
     return;
-  };
+  }
 
-  // Then generate new reports from radio messages.
-  uint8_t pipe, length;
-  uint8_t data[256];
-  if (dequeueMessage(&pipe, &length, data)) {
+  static uint8_t pipe, length;
+  static uint8_t data[256];
+  while (dequeueMessage(&pipe, &length, data)) {
     if (pipe < 5 && length == 4) {
       updatePipe(pipe, *(uint32_t*)data);
     }
   }
-
-  // And then we wait for more.
-  delay(1);
 }
