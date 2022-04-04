@@ -83,30 +83,13 @@ const int report_buffer_size = 256;
 const int report_size = 7;
 uint8_t report_buffer[report_buffer_size * report_size];
 
-///////////////////////////////////////// KEYBOARD
-
-void show(uint64_t x) {
-  for (int i = 0; i < 64; i++) {
-    Serial.print(x & (ONE << i) ? 1 : 0);
+void initHid() {
+  usb_hid.setReportCallback(NULL, hid_report_callback);
+  usb_hid.begin();
+  while (!TinyUSBDevice.mounted()) {
+    delay(1);
   }
-  Serial.println();
 }
-
-void show(uint32_t x) {
-  for (int i = 0; i < 32; i++) {
-    Serial.print(x & (1UL << i) ? 1 : 0);
-  }
-  Serial.println();
-}
-
-uint32_t keymap[] = {
-  HID_KEY_SPACE, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, HID_KEY_SPACE,
-  HID_KEY_SPACE, HID_KEY_A, HID_KEY_S, HID_KEY_D, HID_KEY_F, HID_KEY_G, HID_KEY_SPACE,
-  HID_KEY_SPACE, HID_KEY_Z, HID_KEY_X, HID_KEY_C, HID_KEY_V, HID_KEY_B, HID_KEY_SPACE,
-};
-
-uint32_t release_keymap[8][32];
-int32_t pipe_state[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
 int8_t mods = 0, weak_mods = 0;
 uint8_t report[6] = { 0, 0, 0, 0, 0, 0 };
@@ -131,10 +114,33 @@ void clearFromReport(uint8_t keycode) {
 
 void generateReport() {
   uint8_t* report_ptr = &report_buffer[(reports_generated * report_size) % report_buffer_size];
-  report_ptr[0] = 0;
+  report_ptr[0] = mods | weak_mods;
   memcpy(report_ptr + 1, report, 6);
   ++reports_generated;
 }
+
+bool sendReports() {
+  while (reports_sent < reports_generated) {
+    if (!usb_hid.ready()) {
+      return false;
+    }
+    uint8_t* report = &report_buffer[(reports_sent * report_size) % report_buffer_size];
+    usb_hid.keyboardReport(0, report[0], report + 1);
+    ++reports_sent;
+  }
+  return true;
+}
+
+///////////////////////////////////////// KEYBOARD
+
+uint32_t keymap[] = {
+  HID_KEY_SPACE, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, HID_KEY_SPACE,
+  HID_KEY_SPACE, HID_KEY_A, HID_KEY_S, HID_KEY_D, HID_KEY_F, HID_KEY_G, HID_KEY_SPACE,
+  HID_KEY_SPACE, HID_KEY_Z, HID_KEY_X, HID_KEY_C, HID_KEY_V, HID_KEY_B, HID_KEY_SPACE,
+};
+
+uint32_t release_keymap[8][32];
+int32_t pipe_state[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
 void handleKey(uint8_t pipe, uint8_t key, bool pressed) {
   if (pressed) {
@@ -168,30 +174,21 @@ void updatePipe(uint8_t pipe, uint32_t new_state) {
 
 void setup() {
   Serial.begin(9600);
-  usb_hid.setReportCallback(NULL, hid_report_callback);
-  usb_hid.begin();
-  while (!TinyUSBDevice.mounted()) {
-    delay(1);
-  }
+  initHid();
   initRadio();
   delay(1000);
 }
 
 void loop() {
-  if (TinyUSBDevice.suspended() && hasMessage()) {
+  if (hasMessage() && TinyUSBDevice.suspended()) {
     TinyUSBDevice.remoteWakeup();
   }
 
   // Send all existing reports.
-  while (reports_sent < reports_generated) {
-    if (!usb_hid.ready()) {
-      delay(1);
-      return;
-    }
-    uint8_t* report = &report_buffer[(reports_sent * report_size) % report_buffer_size];
-    usb_hid.keyboardReport(0, report[0], report + 1);
-    ++reports_sent;
-  }
+  if (!sendReports()) {
+    delay(1);
+    return;
+  };
 
   // Then generate new reports from radio messages.
   uint8_t pipe, length;
