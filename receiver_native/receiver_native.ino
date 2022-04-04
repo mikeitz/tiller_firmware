@@ -133,19 +133,69 @@ bool sendReports() {
 
 ///////////////////////////////////////// KEYBOARD
 
-uint32_t keymap[] = {
-  HID_KEY_SPACE, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, HID_KEY_SPACE,
-  HID_KEY_SPACE, HID_KEY_A, HID_KEY_S, HID_KEY_D, HID_KEY_F, HID_KEY_G, HID_KEY_SPACE,
-  HID_KEY_SPACE, HID_KEY_Z, HID_KEY_X, HID_KEY_C, HID_KEY_V, HID_KEY_B, HID_KEY_SPACE,
+#define TG(layer) HID_KEY_SPACE
+#define LM(mod, layer) HID_KEY_SPACE
+
+#define LAYER_BASE 0
+#define LAYER_TAB 1
+#define LAYER_GAME 2
+#define LAYER_NUM 3
+#define LAYER_SYM 4
+#define LAYER_FN 5
+
+const int num_pipes = 8;
+const int num_layers = 16;
+const int keys_per_pipe = 32;
+
+#define ___ 0
+#define XXX -1
+
+const uint32_t keymap[num_pipes][num_layers][keys_per_pipe] = {
+  { // PIPE 0
+  },
+  { // PIPE 1
+    { // LAYER_BASE
+     HID_KEY_ESCAPE, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, HID_KEY_GUI_LEFT,
+     LM(HID_KEY_CONTROL_LEFT, LAYER_TAB), HID_KEY_A, HID_KEY_S, HID_KEY_D, HID_KEY_F, HID_KEY_G, HID_KEY_SHIFT_LEFT,
+     LM(HID_KEY_ALT_LEFT, LAYER_TAB), HID_KEY_Z, HID_KEY_X, HID_KEY_C, HID_KEY_V, HID_KEY_B, TG(LAYER_NUM),
+    },
+    { // LAYER_TAB
+    },
+    { // LAYER_GAME
+    },
+    { // LAYER_NUM
+    },
+    { // LAYER_SYM
+    },
+    { // LAYER_FN
+    },
+  },
+  { // PIPE 2
+    { // LAYER_BASE
+     TG(LAYER_SYM), HID_KEY_Y, HID_KEY_U, HID_KEY_I, HID_KEY_O, HID_KEY_P, HID_KEY_BACKSPACE,
+     HID_KEY_SPACE, HID_KEY_H, HID_KEY_J, HID_KEY_K, HID_KEY_L, HID_KEY_SEMICOLON, HID_KEY_ENTER,
+     TG(LAYER_FN), HID_KEY_N, HID_KEY_M, HID_KEY_COMMA, HID_KEY_PERIOD, HID_KEY_SLASH, HID_KEY_DELETE,
+    },
+    { // LAYER_TAB
+    },
+    { // LAYER_GAME
+    },
+    { // LAYER_NUM
+    },
+    { // LAYER_SYM
+    },
+    { // LAYER_FN
+    },
+  },
 };
 
-uint32_t release_keymap[8][32];
-int32_t pipe_state[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+uint32_t release_keymap[num_pipes][keys_per_pipe];
+int32_t pipe_state[num_pipes] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
 void handleKey(uint8_t pipe, uint8_t key, bool pressed) {
   if (pressed) {
     weak_mods = 0;
-    uint8_t keycode = (uint8_t)keymap[key];
+    uint8_t keycode = (uint8_t)keymap[pipe][LAYER_BASE][key];
     release_keymap[pipe][key] = keycode;
     addToReport(keycode);
   } else {
@@ -159,7 +209,7 @@ void updatePipe(uint8_t pipe, uint32_t new_state) {
   if (old_state == new_state) {
     return;
   } else {
-    for (int i = 0; i < 32; ++i) {
+    for (int i = 0; i < keys_per_pipe; ++i) {
       uint32_t bit = ONE << i;
       if ((old_state & bit) != (new_state & bit)) {
         handleKey(pipe, i, new_state & bit);
