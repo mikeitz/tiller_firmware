@@ -1,6 +1,9 @@
 #include "nrf_gzll.h"
 #include <Adafruit_TinyUSB.h>
 
+#define DEBUG 1
+const uint64_t ONE = 1;
+
 ///////////////////////////////////////// INTEROP
 
 volatile uint32_t read_count = 0;
@@ -73,13 +76,14 @@ void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
 uint8_t const desc_hid_report[] = { TUD_HID_REPORT_DESC_KEYBOARD() };
 Adafruit_USBD_HID usb_hid(desc_hid_report, sizeof(desc_hid_report), HID_ITF_PROTOCOL_KEYBOARD, 2, false);
 
-// Output report callback for LED indicator such as Caplocks
 void hid_report_callback(uint8_t report_id, hid_report_type_t report_type, uint8_t const* buffer, uint16_t bufsize) {}
 
-///////////////////////////////////////// MAIN
+uint32_t reports_generated = 0, reports_sent = 0;
+const int report_buffer_size = 256;
+const int report_size = 7;
+uint8_t report_buffer[report_buffer_size * report_size];
 
-#define DEBUG 1
-const uint64_t ONE = 1;
+///////////////////////////////////////// KEYBOARD
 
 void show(uint64_t x) {
   for (int i = 0; i < 64; i++) {
@@ -95,27 +99,16 @@ void show(uint32_t x) {
   Serial.println();
 }
 
-void setup() {
-  Serial.begin(9600);
-  usb_hid.setReportCallback(NULL, hid_report_callback);
-  usb_hid.begin();
-  while (!TinyUSBDevice.mounted()) {
-    delay(1);
-  }
-  initRadio();
-  delay(1000);
-}
-
-bool keyPressedPreviously = false;
-
 uint32_t keymap[] = {
   HID_KEY_SPACE, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, HID_KEY_SPACE,
   HID_KEY_SPACE, HID_KEY_A, HID_KEY_S, HID_KEY_D, HID_KEY_F, HID_KEY_G, HID_KEY_SPACE,
   HID_KEY_SPACE, HID_KEY_Z, HID_KEY_X, HID_KEY_C, HID_KEY_V, HID_KEY_B, HID_KEY_SPACE,
 };
-uint32_t release_keymap[32];
 
+uint32_t release_keymap[8][32];
 int32_t pipe_state[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+int8_t mods = 0, weak_mods = 0;
 uint8_t report[6] = { 0, 0, 0, 0, 0, 0 };
 
 void addToReport(uint8_t keycode) {
@@ -136,18 +129,26 @@ void clearFromReport(uint8_t keycode) {
   }
 }
 
+void generateReport() {
+  uint8_t* report_ptr = &report_buffer[(reports_generated * report_size) % report_buffer_size];
+  report_ptr[0] = 0;
+  memcpy(report_ptr + 1, report, 6);
+  ++reports_generated;
+}
+
 void handleKey(uint8_t pipe, uint8_t key, bool pressed) {
   if (pressed) {
+    weak_mods = 0;
     uint8_t keycode = (uint8_t)keymap[key];
-    release_keymap[key] = keycode;
+    release_keymap[pipe][key] = keycode;
     addToReport(keycode);
   } else {
-    uint8_t keycode = (uint8_t)release_keymap[key];
+    uint8_t keycode = (uint8_t)release_keymap[pipe][key];
     clearFromReport(keycode);
   }
 }
 
-void handle(uint8_t pipe, uint32_t new_state) {
+void updatePipe(uint8_t pipe, uint32_t new_state) {
   int32_t old_state = pipe_state[pipe];
   if (old_state == new_state) {
     return;
@@ -156,29 +157,51 @@ void handle(uint8_t pipe, uint32_t new_state) {
       uint32_t bit = ONE << i;
       if ((old_state & bit) != (new_state & bit)) {
         handleKey(pipe, i, new_state & bit);
+        generateReport();
       }
     }
   }
   pipe_state[pipe] = new_state;
-  usb_hid.keyboardReport(0, 0, report);
+}
+
+///////////////////////////////////////// MAIN
+
+void setup() {
+  Serial.begin(9600);
+  usb_hid.setReportCallback(NULL, hid_report_callback);
+  usb_hid.begin();
+  while (!TinyUSBDevice.mounted()) {
+    delay(1);
+  }
+  initRadio();
+  delay(1000);
 }
 
 void loop() {
-  delay(1);
+  if (TinyUSBDevice.suspended() && hasMessage()) {
+    TinyUSBDevice.remoteWakeup();
+  }
 
-  if (!usb_hid.ready())
-    return;
+  // Send all existing reports.
+  while (reports_sent < reports_generated) {
+    if (!usb_hid.ready()) {
+      delay(1);
+      return;
+    }
+    uint8_t* report = &report_buffer[(reports_sent * report_size) % report_buffer_size];
+    usb_hid.keyboardReport(0, report[0], report + 1);
+    ++reports_sent;
+  }
 
+  // Then generate new reports from radio messages.
   uint8_t pipe, length;
   uint8_t data[256];
-
   if (dequeueMessage(&pipe, &length, data)) {
-    if (TinyUSBDevice.suspended()) {
-      TinyUSBDevice.remoteWakeup();
-    }
-
-    if (pipe == 1 && length == 4) {
-      handle(1, *(uint32_t*)data);
+    if (pipe < 5 && length == 4) {
+      updatePipe(pipe, *(uint32_t*)data);
     }
   }
+
+  // And then we wait for more.
+  delay(1);
 }
