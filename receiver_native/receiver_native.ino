@@ -111,31 +111,39 @@ bool keyPressedPreviously = false;
 uint32_t keymap[] = {
   HID_KEY_SPACE, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, HID_KEY_SPACE,
   HID_KEY_SPACE, HID_KEY_A, HID_KEY_S, HID_KEY_D, HID_KEY_F, HID_KEY_G, HID_KEY_SPACE,
-  HID_KEY_SPACE, HID_KEY_Z, HID_KEY_X, HID_KEY_C, HID_KEY_V, HID_KEY_V, HID_KEY_SPACE,
+  HID_KEY_SPACE, HID_KEY_Z, HID_KEY_X, HID_KEY_C, HID_KEY_V, HID_KEY_B, HID_KEY_SPACE,
 };
+uint32_t release_keymap[32];
 
 int32_t pipe_state[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 uint8_t report[6] = { 0, 0, 0, 0, 0, 0 };
 
+void addToReport(uint8_t keycode) {
+  clearFromReport(keycode);
+  for (int i = 0; i < 6; ++i) {
+    if (report[i] == 0) {
+      report[i] = keycode;
+      break;
+    }
+  }
+}
+
+void clearFromReport(uint8_t keycode) {
+  for (int i = 0; i < 6; ++i) {
+    if (report[i] == keycode) {
+      report[i] = 0;
+    }
+  }
+}
+
 void handleKey(uint8_t pipe, uint8_t key, bool pressed) {
-  uint8_t keycode = (uint8_t)keymap[key];
   if (pressed) {
-    for (int i = 0; i < 6; ++i) {
-      if (report[0] == 0) {
-        report[0] = keycode;
-        break;
-      }
-    }
-    report[0] = keycode;
-    usb_hid.keyboardReport(0, 0, report);
+    uint8_t keycode = (uint8_t)keymap[key];
+    release_keymap[key] = keycode;
+    addToReport(keycode);
   } else {
-    for (int i = 0; i < 6; ++i) {
-      if (report[0] == keycode) {
-        report[0] = 0;
-        break;
-      }
-    }
-    usb_hid.keyboardReport(0, 0, report);
+    uint8_t keycode = (uint8_t)release_keymap[key];
+    clearFromReport(keycode);
   }
 }
 
@@ -152,6 +160,7 @@ void handle(uint8_t pipe, uint32_t new_state) {
     }
   }
   pipe_state[pipe] = new_state;
+  usb_hid.keyboardReport(0, 0, report);
 }
 
 void loop() {
