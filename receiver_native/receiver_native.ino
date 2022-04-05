@@ -129,107 +129,87 @@ bool sendReports() {
 
 ///////////////////////////////////////// KEYMAP
 
-#define TG(layer) HID_KEY_SPACE
-#define LM(mod, layer) mod
-#define S(key) key
-
-#define LAYER_BASE 0
-#define LAYER_TAB 1
-#define LAYER_GAME 2
-#define LAYER_NUM 3
-#define LAYER_SYM 4
-#define LAYER_FN 5
-
 const int num_pipes = 8;
 const int num_layers = 16;
-const int keys_per_pipe = 32;
+const int num_keys_per_pipe = 32;
 
-#define ___ 0
-#define XXX 0
+#include "./keymap.h"
 
-const uint32_t keymap[num_pipes][num_layers][keys_per_pipe] = {
-  { // PIPE 0
-  },
-  { // PIPE 1
-    { // LAYER_BASE
-     HID_KEY_TAB, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, HID_KEY_GUI_LEFT,
-     LM(HID_KEY_CONTROL_LEFT, LAYER_TAB), HID_KEY_A, HID_KEY_S, HID_KEY_D, HID_KEY_F, HID_KEY_G, HID_KEY_SHIFT_LEFT,
-     LM(HID_KEY_ALT_LEFT, LAYER_TAB), HID_KEY_Z, HID_KEY_X, HID_KEY_C, HID_KEY_V, HID_KEY_B, TG(LAYER_NUM),
-    },
-    { // LAYER_TAB
-      HID_KEY_F4, ___, ___, ___, ___, ___, S(HID_KEY_TAB),
-      ___, ___, ___, ___, ___, ___, ___,
-      ___, ___, ___, ___, ___, ___, HID_KEY_TAB,
-    },
-    { // LAYER_GAME
-      ___, ___, ___, ___, ___, ___, ___,
-      ___, ___, ___, ___, ___, ___, ___,
-      ___, ___, ___, ___, ___, ___, ___,
-    },
-    { // LAYER_NUM
-      HID_KEY_ESCAPE, XXX, XXX, XXX, XXX, XXX, ___,
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-    },
-    { // LAYER_SYM
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-    },
-    { // LAYER_FN
-      XXX, XXX, XXX, XXX, XXX, XXX, ___,
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-      ___, XXX, XXX, XXX, XXX, XXX, XXX,
-    },
-  },
-  { // PIPE 2
-    { // LAYER_BASE
-     TG(LAYER_SYM), HID_KEY_Y, HID_KEY_U, HID_KEY_I, HID_KEY_O, HID_KEY_P, HID_KEY_BACKSPACE,
-     HID_KEY_SPACE, HID_KEY_H, HID_KEY_J, HID_KEY_K, HID_KEY_L, HID_KEY_SEMICOLON, HID_KEY_ENTER,
-     TG(LAYER_FN), HID_KEY_N, HID_KEY_M, HID_KEY_COMMA, HID_KEY_PERIOD, HID_KEY_SLASH, HID_KEY_DELETE,
-    },
-    { // LAYER_TAB
-      ___, ___, ___, ___, ___, ___, ___,
-      ___, ___, ___, ___, ___, ___, ___,
-      ___, ___, ___, ___, ___, ___, ___,
-    },
-    { // LAYER_GAME
-      ___, ___, ___, ___, ___, ___, ___,
-      ___, ___, ___, ___, ___, ___, ___,
-      ___, ___, ___, ___, ___, ___, ___,
-    },
-    { // LAYER_NUM
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-    },
-    { // LAYER_SYM
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-    },
-    { // LAYER_FN
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-      ___, XXX, XXX, XXX, XXX, XXX, ___,
-    },
-  },
-};
+uint32_t pipe_state[num_pipes] = { 0 };
+uint32_t release_keymap[num_pipes][num_keys_per_pipe] = { 0 };
+int8_t active_layers[num_layers] = {
+  LAYER_BASE, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+uint32_t active_layer_mask = 1;
 
-///////////////////////////////////////// KEYBOARD
+void activateLayer(uint8_t layer) {
+  if (isLayerActive(layer)) {
+    return;
+  }
+  active_layer_mask |= (1 << layer);
+  int i = 0;
+  int8_t move = -1;
+  for (; i < num_layers && active_layers[i] > layer; ++i) {}
+  move = active_layers[i];
+  active_layers[i++] = layer;
+  for (; i < num_layers && move != -1; ++i) {
+    int8_t temp = active_layers[i];
+    active_layers[i] = move;
+    move = temp;
+  }
+}
 
-uint32_t release_keymap[num_pipes][keys_per_pipe];
-int32_t pipe_state[num_pipes] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+void deactivateLayer(uint8_t layer) {
+  if (!isLayerActive(layer)) {
+    return;
+  }
+  active_layer_mask &= ~(1 << layer);
+  int i = 0;
+  for (; i < num_layers && active_layers[i] != layer; ++i) {}
+  for (; i < num_layers && active_layers[i] != -1; ++i) {
+    active_layers[i] = active_layers[i + 1];
+  }
+}
+
+bool isLayerActive(uint8_t layer) {
+  return (1 << layer) & active_layer_mask;
+}
+
+void toggleLayer(uint8_t layer) {
+  if (isLayerActive(layer)) {
+    deactivateLayer(layer);
+  } else {
+    activateLayer(layer);
+  }
+}
+
+uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
+  return keymap[pipe][active_layers[0]][key];
+}
+
+void registerKey(uint32_t keycode) {
+  if (keycode >= MO(0)) {
+    activateLayer(keycode & 0xf);
+  } else {
+    addToReport(keycode);
+  }
+}
+
+void unregisterKey(uint32_t keycode) {
+  if (keycode >= MO(0)) {
+    deactivateLayer(keycode & 0xf);
+  } else {
+    clearFromReport(keycode);
+  }
+}
 
 void handleKey(uint8_t pipe, uint8_t key, bool pressed) {
   if (pressed) {
     per_key_mods = 0;
-    uint8_t keycode = (uint8_t)keymap[pipe][LAYER_BASE][key];
+    uint32_t keycode = getKeyFromMap(pipe, key);
     release_keymap[pipe][key] = keycode;
-    addToReport(keycode);
+    registerKey(keycode);
   } else {
-    uint8_t keycode = (uint8_t)release_keymap[pipe][key];
-    clearFromReport(keycode);
+    unregisterKey(release_keymap[pipe][key]);
   }
 }
 
@@ -238,7 +218,7 @@ void updatePipe(uint8_t pipe, uint32_t new_state) {
   if (old_state == new_state) {
     return;
   } else {
-    for (int i = 0; i < keys_per_pipe; ++i) {
+    for (int i = 0; i < num_keys_per_pipe; ++i) {
       uint32_t bit = ONE << i;
       if ((old_state & bit) != (new_state & bit)) {
         handleKey(pipe, i, new_state & bit);
