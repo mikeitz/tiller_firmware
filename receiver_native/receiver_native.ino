@@ -11,8 +11,6 @@ volatile uint32_t write_count = 0;
 const uint32_t queue_size = 4096;
 volatile uint8_t queue_buffer[queue_size];
 
-volatile uint32_t last_size = 0;
-
 void enqueueMessage(uint8_t pipe, uint8_t length, uint8_t* data) {
   uint32_t cursor = write_count;
   queue_buffer[(cursor++) % queue_size] = pipe;
@@ -20,7 +18,6 @@ void enqueueMessage(uint8_t pipe, uint8_t length, uint8_t* data) {
   for (uint8_t i = 0; i < length; ++i) {
     queue_buffer[(cursor++) % queue_size] = data[i];
   }
-  last_size = length;
   write_count = cursor;
 }
 
@@ -46,10 +43,8 @@ bool dequeueMessage(uint8_t* pipe, uint8_t* length, uint8_t* data) {
 
 ///////////////////////////////////////// RADIO
 
-static uint8_t channel_table[6] = { 4, 25, 42, 63, 77, 33 };
-uint8_t new_data[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
-
 void initRadio() {
+  static uint8_t channel_table[6] = { 4, 25, 42, 63, 77, 33 };
   nrf_gzll_init(NRF_GZLL_MODE_HOST);
   nrf_gzll_set_channel_table(channel_table, 3);
   nrf_gzll_set_timeslots_per_channel(4);
@@ -66,6 +61,7 @@ void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info)
 void nrf_gzll_disabled() {}
 void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {
   uint32_t length = NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH;
+  static uint8_t new_data[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
   if (nrf_gzll_fetch_packet_from_rx_fifo(pipe, new_data, &length)) {
     enqueueMessage(pipe, length, new_data);
   }
@@ -75,7 +71,6 @@ void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
 
 uint8_t const desc_hid_report[] = { TUD_HID_REPORT_DESC_KEYBOARD() };
 Adafruit_USBD_HID usb_hid(desc_hid_report, sizeof(desc_hid_report), HID_ITF_PROTOCOL_KEYBOARD, 2, false);
-
 void hid_report_callback(uint8_t report_id, hid_report_type_t report_type, uint8_t const* buffer, uint16_t bufsize) {}
 
 uint32_t reports_generated = 0, reports_sent = 0;
@@ -113,7 +108,9 @@ void clearFromReport(uint8_t keycode) {
 
 void generateReport() {
   uint8_t* report_ptr = &report_buffer[(reports_generated * report_size) % report_buffer_size];
-  report_ptr[0] = mods | per_key_mods;
+  uint8_t force_on = per_key_mods & 0xf;
+  uint8_t force_off = ((per_key_mods & 0xf0) >> 4) | (per_key_mods & 0xf0);
+  report_ptr[0] = (mods | force_on) & (~force_off);
   memcpy(report_ptr + 1, report, 6);
   ++reports_generated;
 }
@@ -133,7 +130,7 @@ bool sendReports() {
 ///////////////////////////////////////// KEYMAP
 
 #define TG(layer) HID_KEY_SPACE
-#define LM(mod, layer) HID_KEY_SPACE
+#define LM(mod, layer) mod
 #define S(key) key
 
 #define LAYER_BASE 0
