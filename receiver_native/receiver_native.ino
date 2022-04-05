@@ -6,10 +6,10 @@ const uint64_t ONE = 1;
 
 ///////////////////////////////////////// INTEROP
 
-volatile uint32_t read_count = 0;
-volatile uint32_t write_count = 0;
 const uint32_t queue_size = 4096;
 volatile uint8_t queue_buffer[queue_size];
+volatile uint32_t read_count = 0;
+volatile uint32_t write_count = 0;
 
 void enqueueMessage(uint8_t pipe, uint8_t length, uint8_t* data) {
   uint32_t cursor = write_count;
@@ -137,8 +137,7 @@ const int num_keys_per_pipe = 32;
 
 uint32_t pipe_state[num_pipes] = { 0 };
 uint32_t release_keymap[num_pipes][num_keys_per_pipe] = { 0 };
-int8_t active_layers[num_layers] = {
-  LAYER_BASE, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
+int8_t active_layers[num_layers] = { 0 };
 uint32_t active_layer_mask = 1;
 
 void activateLayer(uint8_t layer) {
@@ -147,11 +146,11 @@ void activateLayer(uint8_t layer) {
   }
   active_layer_mask |= (1 << layer);
   int i = 0;
-  int8_t move = -1;
+  int8_t move = 0;
   for (; i < num_layers && active_layers[i] > layer; ++i) {}
   move = active_layers[i];
   active_layers[i++] = layer;
-  for (; i < num_layers && move != -1; ++i) {
+  for (; i < num_layers && move != 0; ++i) {
     int8_t temp = active_layers[i];
     active_layers[i] = move;
     move = temp;
@@ -159,13 +158,13 @@ void activateLayer(uint8_t layer) {
 }
 
 void deactivateLayer(uint8_t layer) {
-  if (!isLayerActive(layer)) {
+  if (!isLayerActive(layer) || layer == 0) {
     return;
   }
   active_layer_mask &= ~(1 << layer);
   int i = 0;
   for (; i < num_layers && active_layers[i] != layer; ++i) {}
-  for (; i < num_layers && active_layers[i] != -1; ++i) {
+  for (; i < num_layers && active_layers[i] != 0; ++i) {
     active_layers[i] = active_layers[i + 1];
   }
 }
@@ -187,16 +186,16 @@ uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
 }
 
 void registerKey(uint32_t keycode) {
-  if (keycode >= MO(0)) {
-    activateLayer(keycode & 0xf);
+  if (keycode & MO(0xf)) {
+    activateLayer((keycode >> 16) & 0xf);
   } else {
     addToReport(keycode);
   }
 }
 
 void unregisterKey(uint32_t keycode) {
-  if (keycode >= MO(0)) {
-    deactivateLayer(keycode & 0xf);
+  if (keycode & MO(0xf)) {
+    deactivateLayer((keycode >> 16) & 0xf);
   } else {
     clearFromReport(keycode);
   }
