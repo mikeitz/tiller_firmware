@@ -185,30 +185,39 @@ uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
   return keymap[pipe][active_layers[0]][key];
 }
 
+inline bool isMod(uint32_t keycode) {
+  return keycode >= 0xE0 && keycode < 0xF0;
+}
+
+inline void setMod(uint32_t keycode) {
+  mods |= 1 << (keycode & 0xf);
+}
+
+inline void clearMod(uint32_t keycode) {
+  mods &= ~(1 << (keycode & 0xf));
+}
+
 void registerKey(uint32_t keycode) {
   if (keycode & MO(0xf)) {
     activateLayer((keycode >> 16) & 0xf);
+  } else if (isMod(keycode)) {
+    setMod(keycode);
+    generateReport();
   } else {
     addToReport(keycode);
+    generateReport();
   }
 }
 
 void unregisterKey(uint32_t keycode) {
   if (keycode & MO(0xf)) {
     deactivateLayer((keycode >> 16) & 0xf);
+  } else if (isMod(keycode)) {
+    clearMod(keycode);
+    generateReport();
   } else {
     clearFromReport(keycode);
-  }
-}
-
-void handleKey(uint8_t pipe, uint8_t key, bool pressed) {
-  if (pressed) {
-    per_key_mods = 0;
-    uint32_t keycode = getKeyFromMap(pipe, key);
-    release_keymap[pipe][key] = keycode;
-    registerKey(keycode);
-  } else {
-    unregisterKey(release_keymap[pipe][key]);
+    generateReport();
   }
 }
 
@@ -220,8 +229,15 @@ void updatePipe(uint8_t pipe, uint32_t new_state) {
     for (int i = 0; i < num_keys_per_pipe; ++i) {
       uint32_t bit = ONE << i;
       if ((old_state & bit) != (new_state & bit)) {
-        handleKey(pipe, i, new_state & bit);
-        generateReport();
+        if (new_state & bit) {
+          per_key_mods = 0;
+          uint32_t keycode = getKeyFromMap(pipe, i);
+          registerKey(keycode);
+          release_keymap[pipe][i] = keycode;
+        } else {
+          unregisterKey(release_keymap[pipe][i]);
+          release_keymap[pipe][i] = 0;
+        }
       }
     }
   }
