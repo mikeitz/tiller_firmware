@@ -1,7 +1,7 @@
 #define ___ 0x00000000u
 #define XXX 0xffffffffu
 
-#define MOD(mod) ((mod & 0xf) << 8)
+#define MOD(mod) (1 << (8 + (mod & 0xf)))
 #define S(key) (MOD(HID_KEY_SHIFT_LEFT) | key)
 #define C(key) (MOD(HID_KEY_CONTROL_LEFT) | key)
 #define US(key) (MOD(HID_KEY_SHIFT_RIGHT) | key)

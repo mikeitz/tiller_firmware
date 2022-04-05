@@ -80,32 +80,6 @@ uint8_t report_buffer[report_buffer_size * report_size];
 int8_t mods = 0, per_key_mods = 0;
 uint8_t report[6] = { 0, 0, 0, 0, 0, 0 };
 
-void initHid() {
-  usb_hid.setReportCallback(NULL, hid_report_callback);
-  usb_hid.begin();
-  while (!TinyUSBDevice.mounted()) {
-    delay(1);
-  }
-}
-
-void addToReport(uint8_t keycode) {
-  clearFromReport(keycode);
-  for (int i = 0; i < 6; ++i) {
-    if (report[i] == 0) {
-      report[i] = keycode;
-      break;
-    }
-  }
-}
-
-void clearFromReport(uint8_t keycode) {
-  for (int i = 0; i < 6; ++i) {
-    if (report[i] == keycode) {
-      report[i] = 0;
-    }
-  }
-}
-
 void generateReport() {
   uint8_t* report_ptr = &report_buffer[(reports_generated * report_size) % report_buffer_size];
   uint8_t force_on = per_key_mods & 0xf;
@@ -127,7 +101,33 @@ bool sendReports() {
   return true;
 }
 
-///////////////////////////////////////// KEYMAP
+void addToReport(uint8_t keycode) {
+  clearFromReport(keycode);
+  for (int i = 0; i < 6; ++i) {
+    if (report[i] == 0) {
+      report[i] = keycode;
+      break;
+    }
+  }
+}
+
+void clearFromReport(uint8_t keycode) {
+  for (int i = 0; i < 6; ++i) {
+    if (report[i] == keycode) {
+      report[i] = 0;
+    }
+  }
+}
+
+void initHid() {
+  usb_hid.setReportCallback(NULL, hid_report_callback);
+  usb_hid.begin();
+  while (!TinyUSBDevice.mounted()) {
+    delay(1);
+  }
+}
+
+///////////////////////////////////////// KEYBOARD
 
 const int num_pipes = 8;
 const int num_layers = 16;
@@ -135,8 +135,6 @@ const int num_keys_per_pipe = 32;
 
 #include "./keymap.h"
 
-uint32_t pipe_state[num_pipes] = { 0 };
-uint32_t release_keymap[num_pipes][num_keys_per_pipe] = { 0 };
 int8_t active_layers[num_layers] = { 0 };
 uint32_t active_layer_mask = 1;
 
@@ -200,10 +198,14 @@ inline void clearMod(uint32_t keycode) {
 void registerKey(uint32_t keycode) {
   if (keycode & MO(0xf)) {
     activateLayer((keycode >> 16) & 0xf);
-  } else if (isMod(keycode)) {
+  }
+  if (keycode & 0xff00) {
+    per_key_mods = (keycode & 0xff00) >> 8;
+  }
+  if (isMod(keycode)) {
     setMod(keycode);
     generateReport();
-  } else {
+  } else if (keycode & 0xff) {
     addToReport(keycode);
     generateReport();
   }
@@ -212,16 +214,19 @@ void registerKey(uint32_t keycode) {
 void unregisterKey(uint32_t keycode) {
   if (keycode & MO(0xf)) {
     deactivateLayer((keycode >> 16) & 0xf);
-  } else if (isMod(keycode)) {
+  }
+  if (isMod(keycode)) {
     clearMod(keycode);
     generateReport();
-  } else {
+  } else if (keycode & 0xff) {
     clearFromReport(keycode);
     generateReport();
   }
 }
 
 void updatePipe(uint8_t pipe, uint32_t new_state) {
+  static uint32_t pipe_state[num_pipes] = { 0 };
+  static uint32_t release_keymap[num_pipes][num_keys_per_pipe] = { 0 };
   int32_t old_state = pipe_state[pipe];
   if (old_state == new_state) {
     return;
@@ -229,14 +234,11 @@ void updatePipe(uint8_t pipe, uint32_t new_state) {
     for (int i = 0; i < num_keys_per_pipe; ++i) {
       uint32_t bit = ONE << i;
       if ((old_state & bit) != (new_state & bit)) {
+        per_key_mods = 0;
         if (new_state & bit) {
-          per_key_mods = 0;
-          uint32_t keycode = getKeyFromMap(pipe, i);
-          registerKey(keycode);
-          release_keymap[pipe][i] = keycode;
+          registerKey(release_keymap[pipe][i] = getKeyFromMap(pipe, i));
         } else {
           unregisterKey(release_keymap[pipe][i]);
-          release_keymap[pipe][i] = 0;
         }
       }
     }
@@ -264,9 +266,7 @@ void loop() {
     TinyUSBDevice.remoteWakeup();
   }
 
-  if (!sendReports()) {
-    return;
-  }
+  sendReports();
 
   static uint8_t pipe, length;
   static uint8_t data[256];
