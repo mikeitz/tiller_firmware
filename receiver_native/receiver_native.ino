@@ -1,6 +1,10 @@
 #include "nrf_gzll.h"
 #include <Adafruit_TinyUSB.h>
 
+const int num_pipes = 8;
+const int num_keys_per_pipe = 32;
+const int num_layers = 16;
+
 ///////////////////////////////////////// RADIO
 
 class RadioManager {
@@ -76,9 +80,6 @@ public:
       delay(1);
     }
   }
-  inline bool IsMod(uint32_t keycode) {
-    return keycode >= 0xE0 && keycode < 0xF0;
-  }
   inline void SetMod(uint32_t keycode) {
     mods_ |= 1 << (keycode & 0xf);
   }
@@ -108,6 +109,9 @@ public:
     return true;
   }
   void AddToReport(uint8_t keycode) {
+    if (IsMod(keycode)) {
+      return SetMod(keycode);
+    }
     ClearFromReport(keycode);
     for (int i = 0; i < 6; ++i) {
       if (report_[i] == 0) {
@@ -117,6 +121,9 @@ public:
     }
   }
   void ClearFromReport(uint8_t keycode) {
+    if (IsMod(keycode)) {
+      return ClearMod(keycode);
+    }
     for (int i = 0; i < 6; ++i) {
       if (report_[i] == keycode) {
         report_[i] = 0;
@@ -133,6 +140,9 @@ public:
     }
   }
 private:
+  inline bool IsMod(uint32_t keycode) {
+    return keycode >= 0xE0 && keycode < 0xF0;
+  }
   static const uint32_t report_buffer_size_ = 256;
   static const uint8_t report_size_ = 7;
   static void ReportCallback(uint8_t report_id, hid_report_type_t report_type, uint8_t const* buffer, uint16_t bufsize) {}
@@ -201,7 +211,7 @@ private:
 
 #include "./keymap.h"
 
-uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
+uint32_t GetKeyFromMap(uint8_t pipe, uint8_t key) {
   for (int i = 0; i < Layers.GetNumActiveLayers(); ++i) {
     uint32_t keycode = keymap[pipe][Layers.GetActiveLayer(i)][key];
     if (keycode == XXX) {
@@ -214,12 +224,12 @@ uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
   return 0;
 }
 
-uint32_t registerKey(uint32_t keycode) {
+uint32_t RegisterKey(uint32_t keycode) {
   if (keycode == 0) {
     return 0;
   }
   if (keycode >= CUSTOM_KEYCODE(0)) {
-    return registerCustom(keycode);
+    return RegisterCustom(keycode);
   }
   if (keycode & MOMENTARY(0xf)) {
     uint8_t layer = (keycode >> 16) & 0xf;
@@ -232,22 +242,17 @@ uint32_t registerKey(uint32_t keycode) {
   if (keycode & 0xff00) {
     Hid.SetPerKeyMods((keycode & 0xff00) >> 8);
   }
-  if (Hid.IsMod(keycode)) {
-    Hid.SetMod(keycode);
-    Hid.GenerateReport();
-  } else if (keycode & 0xff) {
-    Hid.AddToReport(keycode & 0xff);
-    Hid.GenerateReport();
-  }
+  Hid.AddToReport(keycode & 0xff);
+  Hid.GenerateReport();
   return keycode;
 }
 
-void unregisterKey(uint32_t keycode) {
+void UnregisterKey(uint32_t keycode) {
   if (keycode == 0) {
     return;
   }
   if (keycode >= CUSTOM_KEYCODE(0)) {
-    return unregisterCustom(keycode);
+    return UnregisterCustom(keycode);
   }
   if (keycode & MOMENTARY(0xf)) {
     uint8_t layer = (keycode >> 16) & 0xf;
@@ -257,16 +262,11 @@ void unregisterKey(uint32_t keycode) {
       Layers.DeactivateLayer((keycode >> 16) & 0xf);
     }
   }
-  if (Hid.IsMod(keycode)) {
-    Hid.ClearMod(keycode);
-    Hid.GenerateReport();
-  } else if (keycode & 0xff) {
-    Hid.ClearFromReport(keycode & 0xff);
-    Hid.GenerateReport();
-  }
+  Hid.ClearFromReport(keycode & 0xff);
+  Hid.GenerateReport();
 }
 
-void updatePipe(uint8_t pipe, uint32_t new_state) {
+void UpdatePipe(uint8_t pipe, uint32_t new_state) {
   static uint32_t pipe_state[num_pipes] = { 0 };
   static uint32_t release_keymap[num_pipes][num_keys_per_pipe] = { 0 };
   int32_t old_state = pipe_state[pipe];
@@ -278,9 +278,9 @@ void updatePipe(uint8_t pipe, uint32_t new_state) {
       if ((old_state & bit) != (new_state & bit)) {
         Hid.SetPerKeyMods(0);
         if (new_state & bit) {
-          release_keymap[pipe][i] = registerKey(getKeyFromMap(pipe, i));
+          release_keymap[pipe][i] = RegisterKey(GetKeyFromMap(pipe, i));
         } else {
-          unregisterKey(release_keymap[pipe][i]);
+          UnregisterKey(release_keymap[pipe][i]);
         }
       }
     }
@@ -311,7 +311,7 @@ void loop() {
   static uint8_t data[256];
   while (Radio.DequeueMessage(&pipe, &length, data)) {
     if (pipe < 5 && length == 4) {
-      updatePipe(pipe, *(uint32_t*)data);
+      UpdatePipe(pipe, *(uint32_t*)data);
     }
   }
 }

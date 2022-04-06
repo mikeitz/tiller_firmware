@@ -9,10 +9,6 @@
 //     0x1X = toggle layer X
 // 25-32 > 0, custom keycode
 
-const int num_pipes = 8;
-const int num_keys_per_pipe = 32;
-const int num_layers = 16;
-
 #define ___ 0x00000000u
 #define XXX 0xffffffffu
 
@@ -35,39 +31,39 @@ const int num_layers = 16;
 #define GUI_OR_STAB CUSTOM_KEYCODE(2)
 #define NUM_OR_TAB CUSTOM_KEYCODE(3)
 
-uint32_t registerCustom(uint32_t keycode) {
+uint32_t RegisterCustom(uint32_t keycode) {
   switch (keycode) {
   case TAB_OR_F4:
     if (Layers.GetNumActiveLayers() == 1 && Hid.IsModSet(HID_KEY_ALT_LEFT)) {
-      return registerKey(HID_KEY_F4);
+      return RegisterKey(HID_KEY_F4);
     } else {
-      return registerKey(HID_KEY_TAB);
+      return RegisterKey(HID_KEY_TAB);
     }
   case GUI_OR_STAB:
     if (Layers.GetNumActiveLayers() == 1 && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT))) {
-      return registerKey(SHIFT(HID_KEY_TAB));
+      return RegisterKey(SHIFT(HID_KEY_TAB));
     } else {
-      return registerKey(HID_KEY_GUI_LEFT);
+      return RegisterKey(HID_KEY_GUI_LEFT);
     }
   case NUM_OR_TAB:
     if (Layers.GetNumActiveLayers() == 1 && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT))) {
-      return registerKey(HID_KEY_TAB);
+      return RegisterKey(HID_KEY_TAB);
     } else {
-      return registerKey(MOMENTARY(LAYER_NUM));
+      return RegisterKey(MOMENTARY(LAYER_NUM));
     }
   default:
     return keycode;
   }
 }
 
-void unregisterCustom(uint32_t keycode) {
+void UnregisterCustom(uint32_t keycode) {
   switch (keycode) {
   default:
     return;
   }
 }
 
-const uint32_t leftPipeMap[num_layers][num_keys_per_pipe] = {
+const uint32_t left_map[num_layers][num_keys_per_pipe] = {
   [LAYER_BASE] = {
     TAB_OR_F4, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, GUI_OR_STAB,
     HID_KEY_CONTROL_LEFT, HID_KEY_A, HID_KEY_S, HID_KEY_D, HID_KEY_F, HID_KEY_G, HID_KEY_SHIFT_LEFT,
@@ -95,7 +91,7 @@ const uint32_t leftPipeMap[num_layers][num_keys_per_pipe] = {
   },
 };
 
-const uint32_t rightPipeMap[num_layers][num_keys_per_pipe] = {
+const uint32_t right_map[num_layers][num_keys_per_pipe] = {
   [LAYER_BASE] = {
      MOMENTARY(LAYER_FN), HID_KEY_Y, HID_KEY_U, HID_KEY_I, HID_KEY_O, HID_KEY_P, HID_KEY_BACKSPACE,
      HID_KEY_SPACE, HID_KEY_H, HID_KEY_J, HID_KEY_K, HID_KEY_L, HID_KEY_SEMICOLON, HID_KEY_ENTER,
@@ -119,15 +115,15 @@ const uint32_t rightPipeMap[num_layers][num_keys_per_pipe] = {
   },
 };
 
-const uint32_t emptyPipeMap[num_layers][num_keys_per_pipe] = {};
+const uint32_t empty_map[num_layers][num_keys_per_pipe] = {};
 
 const uint32_t(*keymap[num_pipes])[num_keys_per_pipe] = {
-  emptyPipeMap,
-  leftPipeMap,
-  rightPipeMap,
-  emptyPipeMap,
-  emptyPipeMap,
-  emptyPipeMap,
-  emptyPipeMap,
-  emptyPipeMap,
+  empty_map,
+  left_map,
+  right_map,
+  empty_map,
+  empty_map,
+  empty_map,
+  empty_map,
+  empty_map,
 };
