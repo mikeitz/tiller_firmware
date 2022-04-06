@@ -1,12 +1,15 @@
-#define LAYER_BASE 0
-#define LAYER_GAME 1
-#define LAYER_SYM 2
-#define LAYER_NUM 3
-#define LAYER_FN 4
+enum Layer {
+  LAYER_GAME = 1,
+  LAYER_SYM,
+  LAYER_NUM,
+  LAYER_FN,
+};
 
-#define TAB_OR_F4 CUSTOM_KEYCODE(1)
-#define GUI_OR_STAB CUSTOM_KEYCODE(2)
-#define NUM_OR_TAB CUSTOM_KEYCODE(3)
+enum CustomKeycode {
+  TAB_OR_F4 = CUSTOM_KEYCODE(0),
+  GUI_OR_STAB,
+  NUM_OR_TAB
+};
 
 uint32_t RegisterCustom(uint32_t keycode) {
   switch (keycode) {
