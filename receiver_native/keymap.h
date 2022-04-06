@@ -84,13 +84,15 @@ const uint32_t rightPipeMap[num_layers][num_keys_per_pipe] = {
   },
 };
 
+const uint32_t emptyPipeMap[num_layers][num_keys_per_pipe] = {};
+
 const uint32_t(*keymap[num_pipes])[num_keys_per_pipe] = {
-  nullptr,
+  emptyPipeMap,
   leftPipeMap,
   rightPipeMap,
-  nullptr,
-  nullptr,
-  nullptr,
-  nullptr,
-  nullptr,
+  emptyPipeMap,
+  emptyPipeMap,
+  emptyPipeMap,
+  emptyPipeMap,
+  emptyPipeMap,
 };
