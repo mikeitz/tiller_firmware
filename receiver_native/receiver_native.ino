@@ -180,7 +180,21 @@ void toggleLayer(uint8_t layer) {
 }
 
 uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
-  return keymap[pipe][active_layers[0]][key];
+  for (int i = 0; i < num_layers; ++i) {
+    uint8_t layer = active_layers[i];
+    uint32_t keycode = keymap[pipe][layer][key];
+    if (layer == 0) {
+      return keycode;
+    }
+    if (keycode == ___) {
+      continue;
+    }
+    if (keycode == XXX) {
+      return 0;
+    }
+    return keycode;
+  }
+  return 0;
 }
 
 inline bool isMod(uint32_t keycode) {
@@ -195,8 +209,13 @@ inline void clearMod(uint32_t keycode) {
   mods &= ~(1 << (keycode & 0xf));
 }
 
-void registerKey(uint32_t keycode) {
+uint32_t registerKey(uint32_t keycode) {
+  if (keycode == 0) {
+    return 0;
+  }
+  // TODO: TAB_OR_F4, GUI_OR_STAB, NUM_OR_TAB -- custom keys with custom unregisters
   if (keycode & MO(0xf)) {
+    // TODO: TG(X) vs MO(X)
     activateLayer((keycode >> 16) & 0xf);
   }
   if (keycode & 0xff00) {
@@ -209,9 +228,13 @@ void registerKey(uint32_t keycode) {
     addToReport(keycode);
     generateReport();
   }
+  return keycode;
 }
 
 void unregisterKey(uint32_t keycode) {
+  if (keycode == 0) {
+    return;
+  }
   if (keycode & MO(0xf)) {
     deactivateLayer((keycode >> 16) & 0xf);
   }
@@ -236,7 +259,7 @@ void updatePipe(uint8_t pipe, uint32_t new_state) {
       if ((old_state & bit) != (new_state & bit)) {
         per_key_mods = 0;
         if (new_state & bit) {
-          registerKey(release_keymap[pipe][i] = getKeyFromMap(pipe, i));
+          release_keymap[pipe][i] = registerKey(getKeyFromMap(pipe, i));
         } else {
           unregisterKey(release_keymap[pipe][i]);
         }

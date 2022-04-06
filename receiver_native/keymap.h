@@ -10,10 +10,13 @@
 #define TG(layer) ((0x1u << 20) | MO(layer))
 
 // bits:
+// all 0 = transparent to next layer
 // 0-8 keycode
-// 0-8 per-key modifiers (4 bits force, 4 bits anti-force)
-// 0-8 opcode 0x1X = momentary layer Xw, 0x2X = toggle layer X
-// 0-8 reserved
+// 9-12 per key modifiers; 1=ctrl 2=shift 4=alt 8=gui
+// 13-16 per key anti-modifiers; 1=ctrl 2=shift 4=alt 8=gui
+// 17-24 opcode 0x0X = momentary layer X, 0x1X = toggle layer X
+// 25-32 > 0, custom keycode with argument of lower 3 bytes
+// all f = no action, opaque to other layers, stop
 
 #define LAYER_BASE 0
 #define LAYER_GAME 1
