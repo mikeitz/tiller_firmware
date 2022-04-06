@@ -34,23 +34,14 @@
 uint32_t RegisterCustom(uint32_t keycode) {
   switch (keycode) {
   case TAB_OR_F4:
-    if (Layers.GetNumActiveLayers() == 1 && Hid.IsModSet(HID_KEY_ALT_LEFT)) {
-      return RegisterKey(HID_KEY_F4);
-    } else {
-      return RegisterKey(HID_KEY_TAB);
-    }
+    return Layers.IsBase() && Hid.IsModSet(HID_KEY_ALT_LEFT) ?
+      RegisterKey(HID_KEY_F4) : RegisterKey(HID_KEY_TAB);
   case GUI_OR_STAB:
-    if (Layers.GetNumActiveLayers() == 1 && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT))) {
-      return RegisterKey(SHIFT(HID_KEY_TAB));
-    } else {
-      return RegisterKey(HID_KEY_GUI_LEFT);
-    }
+    return Layers.IsBase() && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT)) ?
+      RegisterKey(SHIFT(HID_KEY_TAB)) : RegisterKey(HID_KEY_GUI_LEFT);
   case NUM_OR_TAB:
-    if (Layers.GetNumActiveLayers() == 1 && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT))) {
-      return RegisterKey(HID_KEY_TAB);
-    } else {
-      return RegisterKey(MOMENTARY(LAYER_NUM));
-    }
+    return Layers.IsBase() && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT)) ?
+      RegisterKey(HID_KEY_TAB) : RegisterKey(MOMENTARY(LAYER_NUM));
   default:
     return keycode;
   }

@@ -201,6 +201,9 @@ public:
   uint8_t GetActiveLayer(uint8_t i) {
     return active_layers_[i];
   }
+  bool IsBase() {
+    return active_layer_mask_ = 1;
+  }
 private:
   int8_t active_layers_[num_layers] = { 0 };
   uint32_t active_layer_mask_ = 1;
