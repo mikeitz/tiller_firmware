@@ -209,15 +209,30 @@ inline void clearMod(uint32_t keycode) {
   mods &= ~(1 << (keycode & 0xf));
 }
 
+inline bool isModSet(uint32_t mod) {
+  return (1 << (mod & 0xf)) & mods;
+}
+
 uint32_t registerCustom(uint32_t keycode) {
-  // TODO: TAB_OR_F4, GUI_OR_STAB, NUM_OR_TAB -- custom keys with custom unregister
   switch (keycode) {
   case TAB_OR_F4:
-    return registerKey(HID_KEY_TAB);
+    if (isModSet(HID_KEY_ALT_LEFT)) {
+      return registerKey(HID_KEY_F4);
+    } else {
+      return registerKey(HID_KEY_TAB);
+    }
   case GUI_OR_STAB:
-    return registerKey(HID_KEY_GUI_LEFT);
+    if (isModSet(HID_KEY_ALT_LEFT) || isModSet(HID_KEY_CONTROL_LEFT)) {
+      return registerKey(S(HID_KEY_TAB));
+    } else {
+      return registerKey(HID_KEY_GUI_LEFT);
+    }
   case NUM_OR_TAB:
-    return registerKey(MO(LAYER_NUM));
+    if (isModSet(HID_KEY_ALT_LEFT) || isModSet(HID_KEY_CONTROL_LEFT)) {
+      return registerKey(HID_KEY_TAB);
+    } else {
+      return registerKey(MO(LAYER_NUM));
+    }
   default:
     return keycode;
   }
@@ -235,7 +250,7 @@ uint32_t registerKey(uint32_t keycode) {
     return 0;
   }
   if (keycode >= CUSTOM_KEYCODE(0)) {
-    return registerCustom(0);
+    return registerCustom(keycode);
   }
   if (keycode & MO(0xf)) {
     // TODO: TG(X) vs MO(X)
@@ -248,7 +263,7 @@ uint32_t registerKey(uint32_t keycode) {
     setMod(keycode);
     generateReport();
   } else if (keycode & 0xff) {
-    addToReport(keycode);
+    addToReport(keycode & 0xff);
     generateReport();
   }
   return keycode;
@@ -259,16 +274,18 @@ void unregisterKey(uint32_t keycode) {
     return;
   }
   if (keycode >= CUSTOM_KEYCODE(0)) {
-    return unregisterCustom(0);
+    unregisterCustom(keycode);
+    return;
   }
   if (keycode & MO(0xf)) {
+    // TODO: TG(X) vs MO(X)
     deactivateLayer((keycode >> 16) & 0xf);
   }
   if (isMod(keycode)) {
     clearMod(keycode);
     generateReport();
   } else if (keycode & 0xff) {
-    clearFromReport(keycode);
+    clearFromReport(keycode & 0xff);
     generateReport();
   }
 }

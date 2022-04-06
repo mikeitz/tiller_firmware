@@ -28,9 +28,9 @@
 
 #define CUSTOM_KEYCODE(x) (x + 0x01000000)
 
-#define TAB_OR_F4 HID_KEY_TAB // (CUSTOM_KEYCODE + 1)
-#define GUI_OR_STAB HID_KEY_GUI_LEFT // (CUSTOM_KEYCODE + 2)
-#define NUM_OR_TAB MO(LAYER_NUM) // (CUSTOM_KEYCODE + 3)
+#define TAB_OR_F4 CUSTOM_KEYCODE(1)
+#define GUI_OR_STAB CUSTOM_KEYCODE(2)
+#define NUM_OR_TAB CUSTOM_KEYCODE(3)
 
 const uint32_t leftPipeMap[num_layers][num_keys_per_pipe] = {
   [LAYER_BASE] = {
