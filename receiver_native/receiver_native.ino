@@ -80,6 +80,22 @@ uint8_t report_buffer[report_buffer_size * report_size];
 int8_t mods = 0, per_key_mods = 0;
 uint8_t report[6] = { 0, 0, 0, 0, 0, 0 };
 
+inline bool isMod(uint32_t keycode) {
+  return keycode >= 0xE0 && keycode < 0xF0;
+}
+
+inline void setMod(uint32_t keycode) {
+  mods |= 1 << (keycode & 0xf);
+}
+
+inline void clearMod(uint32_t keycode) {
+  mods &= ~(1 << (keycode & 0xf));
+}
+
+inline bool isModSet(uint32_t mod) {
+  return (1 << (mod & 0xf)) & mods;
+}
+
 void generateReport() {
   uint8_t* report_ptr = &report_buffer[(reports_generated * report_size) % report_buffer_size];
   uint8_t force_on = per_key_mods & 0xf;
@@ -127,14 +143,9 @@ void initHid() {
   }
 }
 
-///////////////////////////////////////// KEYBOARD
+///////////////////////////////////////// LAYERS
 
-const int num_pipes = 8;
 const int num_layers = 16;
-const int num_keys_per_pipe = 32;
-
-#include "./keymap.h"
-
 int8_t active_layers[num_layers] = { 0 };
 uint32_t active_layer_mask = 1;
 
@@ -179,6 +190,13 @@ void toggleLayer(uint8_t layer) {
   }
 }
 
+///////////////////////////////////////// KEYMAP
+
+const int num_pipes = 8;
+const int num_keys_per_pipe = 32;
+
+#include "./keymap.h"
+
 uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
   for (int i = 0; i < num_layers; ++i) {
     uint8_t layer = active_layers[i];
@@ -197,21 +215,7 @@ uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
   return 0;
 }
 
-inline bool isMod(uint32_t keycode) {
-  return keycode >= 0xE0 && keycode < 0xF0;
-}
-
-inline void setMod(uint32_t keycode) {
-  mods |= 1 << (keycode & 0xf);
-}
-
-inline void clearMod(uint32_t keycode) {
-  mods &= ~(1 << (keycode & 0xf));
-}
-
-inline bool isModSet(uint32_t mod) {
-  return (1 << (mod & 0xf)) & mods;
-}
+///////////////////////////////////////// KEYBOARD
 
 uint32_t registerCustom(uint32_t keycode) {
   switch (keycode) {
