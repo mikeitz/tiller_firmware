@@ -1,9 +1,6 @@
 #include "nrf_gzll.h"
 #include <Adafruit_TinyUSB.h>
-
-const int num_pipes = 8;
-const int num_keys_per_pipe = 32;
-const int num_layers = 16;
+#include "./keymap.h"
 
 ///////////////////////////////////////// RADIO
 
@@ -68,7 +65,7 @@ void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info)
 
 ///////////////////////////////////////// HID
 
-static uint8_t const desc_hid_report[] = { TUD_HID_REPORT_DESC_KEYBOARD() };
+const uint8_t desc_hid_report[] = { TUD_HID_REPORT_DESC_KEYBOARD() };
 Adafruit_USBD_HID usb_hid(desc_hid_report, sizeof(desc_hid_report), HID_ITF_PROTOCOL_KEYBOARD, 2, false);
 
 class HidManager {
@@ -202,8 +199,6 @@ private:
 } Layers;
 
 ///////////////////////////////////////// KEYBOARD
-
-#include "./keymap.h"
 
 uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
   for (int i = 0; i < Layers.GetNumActiveLayers(); ++i) {

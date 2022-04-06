@@ -1,15 +1,4 @@
-#define ___ 0x00000000u
-#define XXX 0xffffffffu
-
-#define MOD(mod) (1 << (8 + (mod & 0xf)))
-#define SHIFT(key) (MOD(HID_KEY_SHIFT_LEFT) | key)
-#define CTRL(key) (MOD(HID_KEY_CONTROL_LEFT) | key)
-#define UNSHIFT(key) (MOD(HID_KEY_SHIFT_RIGHT) | key)
-
-#define MOMENTARY(layer) (layer << 16)
-#define TOGGLE(layer) ((0x1u << 20) | MOMENTARY(layer))
-
-// bits:
+// Layout of 32 bit keycodes:
 // all 0 = transparent to next layer
 // all f = no action, opaque to other layers, stop
 // 0-8 keycode
@@ -20,13 +9,27 @@
 //     0x1X = toggle layer X
 // 25-32 > 0, custom keycode
 
+const int num_pipes = 8;
+const int num_keys_per_pipe = 32;
+const int num_layers = 16;
+
+#define ___ 0x00000000u
+#define XXX 0xffffffffu
+
+#define MOD(mod) (1 << (8 + (mod & 0xf)))
+#define SHIFT(key) (MOD(HID_KEY_SHIFT_LEFT) | key)
+#define CTRL(key) (MOD(HID_KEY_CONTROL_LEFT) | key)
+#define UNSHIFT(key) (MOD(HID_KEY_SHIFT_RIGHT) | key)
+
+#define MOMENTARY(layer) (layer << 16)
+#define TOGGLE(layer) ((0x1u << 20) | MOMENTARY(layer))
+#define CUSTOM_KEYCODE(x) (x + 0x01000000)
+
 #define LAYER_BASE 0
 #define LAYER_GAME 1
 #define LAYER_SYM 2
 #define LAYER_NUM 3
 #define LAYER_FN 4
-
-#define CUSTOM_KEYCODE(x) (x + 0x01000000)
 
 #define TAB_OR_F4 CUSTOM_KEYCODE(1)
 #define GUI_OR_STAB CUSTOM_KEYCODE(2)
