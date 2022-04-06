@@ -209,11 +209,34 @@ inline void clearMod(uint32_t keycode) {
   mods &= ~(1 << (keycode & 0xf));
 }
 
+uint32_t registerCustom(uint32_t keycode) {
+  // TODO: TAB_OR_F4, GUI_OR_STAB, NUM_OR_TAB -- custom keys with custom unregister
+  switch (keycode) {
+  case TAB_OR_F4:
+    return registerKey(HID_KEY_TAB);
+  case GUI_OR_STAB:
+    return registerKey(HID_KEY_GUI_LEFT);
+  case NUM_OR_TAB:
+    return registerKey(MO(LAYER_NUM));
+  default:
+    return keycode;
+  }
+}
+
+void unregisterCustom(uint32_t keycode) {
+  switch (keycode) {
+  default:
+    return;
+  }
+}
+
 uint32_t registerKey(uint32_t keycode) {
   if (keycode == 0) {
     return 0;
   }
-  // TODO: TAB_OR_F4, GUI_OR_STAB, NUM_OR_TAB -- custom keys with custom unregisters
+  if (keycode >= CUSTOM_KEYCODE(0)) {
+    return registerCustom(0);
+  }
   if (keycode & MO(0xf)) {
     // TODO: TG(X) vs MO(X)
     activateLayer((keycode >> 16) & 0xf);
@@ -234,6 +257,9 @@ uint32_t registerKey(uint32_t keycode) {
 void unregisterKey(uint32_t keycode) {
   if (keycode == 0) {
     return;
+  }
+  if (keycode >= CUSTOM_KEYCODE(0)) {
+    return unregisterCustom(0);
   }
   if (keycode & MO(0xf)) {
     deactivateLayer((keycode >> 16) & 0xf);

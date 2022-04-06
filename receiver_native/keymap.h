@@ -11,12 +11,14 @@
 
 // bits:
 // all 0 = transparent to next layer
+// all f = no action, opaque to other layers, stop
 // 0-8 keycode
 // 9-12 per key modifiers; 1=ctrl 2=shift 4=alt 8=gui
-// 13-16 per key anti-modifiers; 1=ctrl 2=shift 4=alt 8=gui
-// 17-24 opcode 0x0X = momentary layer X, 0x1X = toggle layer X
-// 25-32 > 0, custom keycode with argument of lower 3 bytes
-// all f = no action, opaque to other layers, stop
+// 13-16 per key anti-modifiers; as above
+// 17-24 opcode
+//     0x0X = momentary layer X
+//     0x1X = toggle layer X
+// 25-32 > 0, custom keycode
 
 #define LAYER_BASE 0
 #define LAYER_GAME 1
@@ -24,9 +26,11 @@
 #define LAYER_SYM 3
 #define LAYER_FN 4
 
-#define TAB_OR_F4 HID_KEY_TAB
-#define GUI_OR_STAB HID_KEY_GUI_LEFT
-#define NUM_OR_TAB MO(LAYER_NUM)
+#define CUSTOM_KEYCODE(x) (x + 0x01000000)
+
+#define TAB_OR_F4 HID_KEY_TAB // (CUSTOM_KEYCODE + 1)
+#define GUI_OR_STAB HID_KEY_GUI_LEFT // (CUSTOM_KEYCODE + 2)
+#define NUM_OR_TAB MO(LAYER_NUM) // (CUSTOM_KEYCODE + 3)
 
 const uint32_t leftPipeMap[num_layers][num_keys_per_pipe] = {
   [LAYER_BASE] = {
