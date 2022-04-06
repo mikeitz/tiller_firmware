@@ -7,7 +7,7 @@ const int num_layers = 16;
 
 ///////////////////////////////////////// RADIO
 
-class Radio {
+class RadioManager {
 public:
   void Init() {
     static uint8_t channel_table[6] = { 4, 25, 42, 63, 77, 33 };
@@ -53,14 +53,25 @@ private:
   volatile uint8_t queue_buffer_[queue_size_];
   volatile uint32_t read_count_ = 0;
   volatile uint32_t write_count_ = 0;
-};
+} Radio;
+
+void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {}
+void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {}
+void nrf_gzll_disabled() {}
+void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {
+  uint32_t length = NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH;
+  static uint8_t new_data[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
+  if (nrf_gzll_fetch_packet_from_rx_fifo(pipe, new_data, &length)) {
+    Radio.EnqueueMessage(pipe, length, new_data);
+  }
+}
 
 ///////////////////////////////////////// HID
 
 static uint8_t const desc_hid_report[] = { TUD_HID_REPORT_DESC_KEYBOARD() };
 Adafruit_USBD_HID usb_hid(desc_hid_report, sizeof(desc_hid_report), HID_ITF_PROTOCOL_KEYBOARD, 2, false);
 
-class Hid {
+class HidManager {
 public:
   void Init() {
     usb_hid.setReportCallback(NULL, ReportCallback);
@@ -133,11 +144,11 @@ private:
   uint8_t report_buffer_[report_buffer_size_ * report_size_];
   int8_t mods_ = 0, per_key_mods_ = 0;
   uint8_t report_[6] = { 0, 0, 0, 0, 0, 0 };
-};
+} Hid;
 
 ///////////////////////////////////////// LAYERS
 
-class Layers {
+class LayersManager {
 public:
   void ActivateLayer(uint8_t layer) {
     if (IsLayerActive(layer)) {
@@ -188,17 +199,15 @@ private:
   int8_t active_layers_[num_layers] = { 0 };
   uint32_t active_layer_mask_ = 1;
   uint8_t num_active_layers_ = 1;
-};
+} Layers;
 
 ///////////////////////////////////////// KEYBOARD
 
-Hid hid;
-Layers layers;
 #include "./keymap.h"
 
 uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
-  for (int i = 0; i < layers.GetNumActiveLayers(); ++i) {
-    uint32_t keycode = keymap[pipe][layers.GetActiveLayer(i)][key];
+  for (int i = 0; i < Layers.GetNumActiveLayers(); ++i) {
+    uint32_t keycode = keymap[pipe][Layers.GetActiveLayer(i)][key];
     if (keycode == XXX) {
       return 0;
     }
@@ -212,19 +221,19 @@ uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
 uint32_t registerCustom(uint32_t keycode) {
   switch (keycode) {
   case TAB_OR_F4:
-    if (layers.GetNumActiveLayers() == 1 && hid.IsModSet(HID_KEY_ALT_LEFT)) {
+    if (Layers.GetNumActiveLayers() == 1 && Hid.IsModSet(HID_KEY_ALT_LEFT)) {
       return registerKey(HID_KEY_F4);
     } else {
       return registerKey(HID_KEY_TAB);
     }
   case GUI_OR_STAB:
-    if (layers.GetNumActiveLayers() == 1 && (hid.IsModSet(HID_KEY_ALT_LEFT) || hid.IsModSet(HID_KEY_CONTROL_LEFT))) {
+    if (Layers.GetNumActiveLayers() == 1 && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT))) {
       return registerKey(SHIFT(HID_KEY_TAB));
     } else {
       return registerKey(HID_KEY_GUI_LEFT);
     }
   case NUM_OR_TAB:
-    if (layers.GetNumActiveLayers() == 1 && (hid.IsModSet(HID_KEY_ALT_LEFT) || hid.IsModSet(HID_KEY_CONTROL_LEFT))) {
+    if (Layers.GetNumActiveLayers() == 1 && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT))) {
       return registerKey(HID_KEY_TAB);
     } else {
       return registerKey(MOMENTARY(LAYER_NUM));
@@ -251,20 +260,20 @@ uint32_t registerKey(uint32_t keycode) {
   if (keycode & MOMENTARY(0xf)) {
     uint8_t layer = (keycode >> 16) & 0xf;
     if (keycode & TOGGLE(0)) {
-      layers.ToggleLayer(layer);
+      Layers.ToggleLayer(layer);
     } else {
-      layers.ActivateLayer(layer);
+      Layers.ActivateLayer(layer);
     }
   }
   if (keycode & 0xff00) {
-    hid.SetPerKeyMods((keycode & 0xff00) >> 8);
+    Hid.SetPerKeyMods((keycode & 0xff00) >> 8);
   }
-  if (hid.IsMod(keycode)) {
-    hid.SetMod(keycode);
-    hid.GenerateReport();
+  if (Hid.IsMod(keycode)) {
+    Hid.SetMod(keycode);
+    Hid.GenerateReport();
   } else if (keycode & 0xff) {
-    hid.AddToReport(keycode & 0xff);
-    hid.GenerateReport();
+    Hid.AddToReport(keycode & 0xff);
+    Hid.GenerateReport();
   }
   return keycode;
 }
@@ -281,15 +290,15 @@ void unregisterKey(uint32_t keycode) {
     if (keycode & TOGGLE(0)) {
       // No-op.  Toggle only on register.
     } else {
-      layers.DeactivateLayer((keycode >> 16) & 0xf);
+      Layers.DeactivateLayer((keycode >> 16) & 0xf);
     }
   }
-  if (hid.IsMod(keycode)) {
-    hid.ClearMod(keycode);
-    hid.GenerateReport();
+  if (Hid.IsMod(keycode)) {
+    Hid.ClearMod(keycode);
+    Hid.GenerateReport();
   } else if (keycode & 0xff) {
-    hid.ClearFromReport(keycode & 0xff);
-    hid.GenerateReport();
+    Hid.ClearFromReport(keycode & 0xff);
+    Hid.GenerateReport();
   }
 }
 
@@ -303,7 +312,7 @@ void updatePipe(uint8_t pipe, uint32_t new_state) {
     for (int i = 0; i < num_keys_per_pipe; ++i) {
       uint32_t bit = 1ul << i;
       if ((old_state & bit) != (new_state & bit)) {
-        hid.SetPerKeyMods(0);
+        Hid.SetPerKeyMods(0);
         if (new_state & bit) {
           release_keymap[pipe][i] = registerKey(getKeyFromMap(pipe, i));
         } else {
@@ -312,44 +321,31 @@ void updatePipe(uint8_t pipe, uint32_t new_state) {
       }
     }
   }
-  hid.ResetPerKeyMods();
+  Hid.ResetPerKeyMods();
   pipe_state[pipe] = new_state;
 }
 
 ///////////////////////////////////////// MAIN
 
-Radio radio;
-
-void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {}
-void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {}
-void nrf_gzll_disabled() {}
-void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {
-  uint32_t length = NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH;
-  static uint8_t new_data[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
-  if (nrf_gzll_fetch_packet_from_rx_fifo(pipe, new_data, &length)) {
-    radio.EnqueueMessage(pipe, length, new_data);
-  }
-}
-
 void setup() {
   Serial.begin(9600);
-  hid.Init();
-  radio.Init();
+  Hid.Init();
+  Radio.Init();
   delay(1000);
 }
 
 void loop() {
   delay(1);
 
-  if (radio.HasMessage() && TinyUSBDevice.suspended()) {
+  if (Radio.HasMessage() && TinyUSBDevice.suspended()) {
     TinyUSBDevice.remoteWakeup();
   }
 
-  hid.SendReports();
+  Hid.SendReports();
 
   static uint8_t pipe, length;
   static uint8_t data[256];
-  while (radio.DequeueMessage(&pipe, &length, data)) {
+  while (Radio.DequeueMessage(&pipe, &length, data)) {
     if (pipe < 5 && length == 4) {
       updatePipe(pipe, *(uint32_t*)data);
     }
