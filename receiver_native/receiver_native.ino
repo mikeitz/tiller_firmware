@@ -253,8 +253,12 @@ uint32_t registerKey(uint32_t keycode) {
     return registerCustom(keycode);
   }
   if (keycode & MO(0xf)) {
-    // TODO: TG(X) vs MO(X)
-    activateLayer((keycode >> 16) & 0xf);
+    uint8_t layer = (keycode >> 16) & 0xf;
+    if (keycode & TG(0)) {
+      toggleLayer(layer);
+    } else {
+      activateLayer(layer);
+    }
   }
   if (keycode & 0xff00) {
     per_key_mods = (keycode & 0xff00) >> 8;
@@ -274,12 +278,15 @@ void unregisterKey(uint32_t keycode) {
     return;
   }
   if (keycode >= CUSTOM_KEYCODE(0)) {
-    unregisterCustom(keycode);
-    return;
+    return unregisterCustom(keycode);
   }
   if (keycode & MO(0xf)) {
-    // TODO: TG(X) vs MO(X)
-    deactivateLayer((keycode >> 16) & 0xf);
+    uint8_t layer = (keycode >> 16) & 0xf;
+    if (keycode & TG(0)) {
+      // No-op.  Toggle only on register.
+    } else {
+      deactivateLayer((keycode >> 16) & 0xf);
+    }
   }
   if (isMod(keycode)) {
     clearMod(keycode);
