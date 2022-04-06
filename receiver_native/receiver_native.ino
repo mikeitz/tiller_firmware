@@ -51,7 +51,7 @@ void initRadio() {
   nrf_gzll_set_datarate(NRF_GZLL_DATARATE_1MBIT);
   nrf_gzll_set_timeslot_period(900);
   nrf_gzll_set_base_address_0(0x01020304);
-  nrf_gzll_set_base_address_1(0x05060709);
+  nrf_gzll_set_base_address_1(0x05060708);
   nrf_gzll_set_tx_power(NRF_GZLL_TX_POWER_N8_DBM);
   nrf_gzll_enable();
 }
@@ -92,8 +92,8 @@ inline void clearMod(uint32_t keycode) {
   mods &= ~(1 << (keycode & 0xf));
 }
 
-inline bool isModSet(uint32_t mod) {
-  return (1 << (mod & 0xf)) & mods;
+inline bool isModSet(uint32_t keycode) {
+  return (1 << (keycode & 0xf)) & mods;
 }
 
 void generateReport() {
@@ -201,16 +201,12 @@ uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
   for (int i = 0; i < num_layers; ++i) {
     uint8_t layer = active_layers[i];
     uint32_t keycode = keymap[pipe][layer][key];
-    if (layer == 0) {
-      return keycode;
-    }
-    if (keycode == ___) {
-      continue;
-    }
     if (keycode == XXX) {
       return 0;
     }
-    return keycode;
+    if (keycode != ___ || layer == 0) {
+      return keycode;
+    }
   }
   return 0;
 }
