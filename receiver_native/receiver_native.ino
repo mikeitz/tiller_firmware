@@ -1,6 +1,5 @@
 #include "nrf_gzll.h"
 #include <Adafruit_TinyUSB.h>
-#include "./keymap.h"
 
 ///////////////////////////////////////// RADIO
 
@@ -200,6 +199,8 @@ private:
 
 ///////////////////////////////////////// KEYBOARD
 
+#include "./keymap.h"
+
 uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
   for (int i = 0; i < Layers.GetNumActiveLayers(); ++i) {
     uint32_t keycode = keymap[pipe][Layers.GetActiveLayer(i)][key];
@@ -211,38 +212,6 @@ uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
     }
   }
   return 0;
-}
-
-uint32_t registerCustom(uint32_t keycode) {
-  switch (keycode) {
-  case TAB_OR_F4:
-    if (Layers.GetNumActiveLayers() == 1 && Hid.IsModSet(HID_KEY_ALT_LEFT)) {
-      return registerKey(HID_KEY_F4);
-    } else {
-      return registerKey(HID_KEY_TAB);
-    }
-  case GUI_OR_STAB:
-    if (Layers.GetNumActiveLayers() == 1 && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT))) {
-      return registerKey(SHIFT(HID_KEY_TAB));
-    } else {
-      return registerKey(HID_KEY_GUI_LEFT);
-    }
-  case NUM_OR_TAB:
-    if (Layers.GetNumActiveLayers() == 1 && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT))) {
-      return registerKey(HID_KEY_TAB);
-    } else {
-      return registerKey(MOMENTARY(LAYER_NUM));
-    }
-  default:
-    return keycode;
-  }
-}
-
-void unregisterCustom(uint32_t keycode) {
-  switch (keycode) {
-  default:
-    return;
-  }
 }
 
 uint32_t registerKey(uint32_t keycode) {

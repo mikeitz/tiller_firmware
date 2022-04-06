@@ -35,6 +35,38 @@ const int num_layers = 16;
 #define GUI_OR_STAB CUSTOM_KEYCODE(2)
 #define NUM_OR_TAB CUSTOM_KEYCODE(3)
 
+uint32_t registerCustom(uint32_t keycode) {
+  switch (keycode) {
+  case TAB_OR_F4:
+    if (Layers.GetNumActiveLayers() == 1 && Hid.IsModSet(HID_KEY_ALT_LEFT)) {
+      return registerKey(HID_KEY_F4);
+    } else {
+      return registerKey(HID_KEY_TAB);
+    }
+  case GUI_OR_STAB:
+    if (Layers.GetNumActiveLayers() == 1 && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT))) {
+      return registerKey(SHIFT(HID_KEY_TAB));
+    } else {
+      return registerKey(HID_KEY_GUI_LEFT);
+    }
+  case NUM_OR_TAB:
+    if (Layers.GetNumActiveLayers() == 1 && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT))) {
+      return registerKey(HID_KEY_TAB);
+    } else {
+      return registerKey(MOMENTARY(LAYER_NUM));
+    }
+  default:
+    return keycode;
+  }
+}
+
+void unregisterCustom(uint32_t keycode) {
+  switch (keycode) {
+  default:
+    return;
+  }
+}
+
 const uint32_t leftPipeMap[num_layers][num_keys_per_pipe] = {
   [LAYER_BASE] = {
     TAB_OR_F4, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, GUI_OR_STAB,
