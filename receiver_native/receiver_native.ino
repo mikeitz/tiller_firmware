@@ -239,9 +239,7 @@ uint32_t RegisterKey(uint32_t keycode) {
       Layers.ActivateLayer(layer);
     }
   }
-  if (keycode & 0xff00) {
-    Hid.SetPerKeyMods((keycode & 0xff00) >> 8);
-  }
+  Hid.SetPerKeyMods((keycode & 0xff00) >> 8);
   Hid.AddToReport(keycode & 0xff);
   Hid.GenerateReport();
   return keycode;
@@ -262,6 +260,7 @@ void UnregisterKey(uint32_t keycode) {
       Layers.DeactivateLayer((keycode >> 16) & 0xf);
     }
   }
+  Hid.SetPerKeyMods(0);
   Hid.ClearFromReport(keycode & 0xff);
   Hid.GenerateReport();
 }
@@ -276,7 +275,6 @@ void UpdatePipe(uint8_t pipe, uint32_t new_state) {
     for (int i = 0; i < num_keys_per_pipe; ++i) {
       uint32_t bit = 1ul << i;
       if ((old_state & bit) != (new_state & bit)) {
-        Hid.SetPerKeyMods(0);
         if (new_state & bit) {
           release_keymap[pipe][i] = RegisterKey(GetKeyFromMap(pipe, i));
         } else {
