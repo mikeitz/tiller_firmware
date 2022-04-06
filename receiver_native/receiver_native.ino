@@ -1,9 +1,6 @@
 #include "nrf_gzll.h"
 #include <Adafruit_TinyUSB.h>
 
-#define DEBUG 1
-const uint64_t ONE = 1;
-
 ///////////////////////////////////////// INTEROP
 
 const uint32_t queue_size = 4096;
@@ -216,19 +213,19 @@ uint32_t getKeyFromMap(uint8_t pipe, uint8_t key) {
 uint32_t registerCustom(uint32_t keycode) {
   switch (keycode) {
   case TAB_OR_F4:
-    if (isModSet(HID_KEY_ALT_LEFT)) {
+    if (active_layer_mask == 1 && isModSet(HID_KEY_ALT_LEFT)) {
       return registerKey(HID_KEY_F4);
     } else {
       return registerKey(HID_KEY_TAB);
     }
   case GUI_OR_STAB:
-    if (isModSet(HID_KEY_ALT_LEFT) || isModSet(HID_KEY_CONTROL_LEFT)) {
+    if (active_layer_mask == 1 && (isModSet(HID_KEY_ALT_LEFT) || isModSet(HID_KEY_CONTROL_LEFT))) {
       return registerKey(S(HID_KEY_TAB));
     } else {
       return registerKey(HID_KEY_GUI_LEFT);
     }
   case NUM_OR_TAB:
-    if (isModSet(HID_KEY_ALT_LEFT) || isModSet(HID_KEY_CONTROL_LEFT)) {
+    if (active_layer_mask == 1 && (isModSet(HID_KEY_ALT_LEFT) || isModSet(HID_KEY_CONTROL_LEFT))) {
       return registerKey(HID_KEY_TAB);
     } else {
       return registerKey(MO(LAYER_NUM));
@@ -305,7 +302,7 @@ void updatePipe(uint8_t pipe, uint32_t new_state) {
     return;
   } else {
     for (int i = 0; i < num_keys_per_pipe; ++i) {
-      uint32_t bit = ONE << i;
+      uint32_t bit = 1ul << i;
       if ((old_state & bit) != (new_state & bit)) {
         per_key_mods = 0;
         if (new_state & bit) {
