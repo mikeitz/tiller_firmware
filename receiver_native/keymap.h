@@ -1,26 +1,3 @@
-// Layout of 32 bit keycodes:
-// all 0 = transparent to next layer
-// all f = no action, opaque to other layers, stop
-// 0-8 keycode
-// 9-12 per key modifiers; 1=ctrl 2=shift 4=alt 8=gui
-// 13-16 per key anti-modifiers; as above
-// 17-24 opcode
-//     0x0X = momentary layer X
-//     0x1X = toggle layer X
-// 25-32 > 0, custom keycode
-
-#define ___ 0x00000000u
-#define XXX 0xffffffffu
-
-#define MOD(mod) (1 << (8 + (mod & 0xf)))
-#define SHIFT(key) (MOD(HID_KEY_SHIFT_LEFT) | key)
-#define CTRL(key) (MOD(HID_KEY_CONTROL_LEFT) | key)
-#define UNSHIFT(key) (MOD(HID_KEY_SHIFT_RIGHT) | key)
-
-#define MOMENTARY(layer) (layer << 16)
-#define TOGGLE(layer) ((0x1u << 20) | MOMENTARY(layer))
-#define CUSTOM_KEYCODE(x) (x + 0x01000000)
-
 #define LAYER_BASE 0
 #define LAYER_GAME 1
 #define LAYER_SYM 2
@@ -105,8 +82,6 @@ const uint32_t right_map[num_layers][num_keys_per_pipe] = {
     ___, XXX, XXX, XXX, XXX, XXX, ___,
   },
 };
-
-const uint32_t empty_map[num_layers][num_keys_per_pipe] = {};
 
 const uint32_t(*keymap[num_pipes])[num_keys_per_pipe] = {
   empty_map,
