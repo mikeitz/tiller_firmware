@@ -30,7 +30,7 @@ public:
     }
     write_count_ = cursor;
   }
-  bool HasMessage() {
+  bool const HasMessage() {
     return write_count_ > read_count_;
   }
   bool DequeueMessage(uint8_t* pipe, uint8_t* length, uint8_t* data) {
@@ -86,7 +86,7 @@ public:
   inline void ClearMod(uint32_t keycode) {
     mods_ &= ~(1 << (keycode & 0xf));
   }
-  inline bool IsModSet(uint32_t keycode) {
+  inline const bool IsModSet(uint32_t keycode) {
     return (1 << (keycode & 0xf)) & mods_;
   }
   void GenerateReport() {
@@ -185,7 +185,7 @@ public:
       active_layers_[i] = active_layers_[i + 1];
     }
   }
-  bool IsLayerActive(uint8_t layer) {
+  const bool IsLayerActive(uint8_t layer) {
     return (1 << layer) & active_layer_mask_;
   }
   void ToggleLayer(uint8_t layer) {
@@ -195,13 +195,13 @@ public:
       ActivateLayer(layer);
     }
   }
-  uint8_t GetNumActiveLayers() {
+  const uint8_t GetNumActiveLayers() {
     return num_active_layers_;
   }
-  uint8_t GetActiveLayer(uint8_t i) {
+  const uint8_t GetActiveLayer(uint8_t i) {
     return active_layers_[i];
   }
-  bool IsBase() {
+  const bool IsBase() {
     return active_layer_mask_ == 1;
   }
 private:
