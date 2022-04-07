@@ -202,7 +202,7 @@ public:
     return active_layers_[i];
   }
   bool IsBase() {
-    return active_layer_mask_ = 1;
+    return active_layer_mask_ == 1;
   }
 private:
   int8_t active_layers_[num_layers] = { 0 };
@@ -268,9 +268,11 @@ uint32_t RegisterKey(uint32_t keycode) {
       Layers.ActivateLayer(layer);
     }
   }
-  Hid.SetPerKeyMods((keycode & 0xff00) >> 8);
-  Hid.AddToReport(keycode & 0xff);
-  Hid.GenerateReport();
+  if (keycode & 0xff) {
+    Hid.SetPerKeyMods((keycode & 0xff00) >> 8);
+    Hid.AddToReport(keycode & 0xff);
+    Hid.GenerateReport();
+  }
   return keycode;
 }
 
@@ -289,9 +291,11 @@ void UnregisterKey(uint32_t keycode) {
       Layers.DeactivateLayer((keycode >> 16) & 0xf);
     }
   }
-  Hid.SetPerKeyMods(0);
-  Hid.ClearFromReport(keycode & 0xff);
-  Hid.GenerateReport();
+  if (keycode & 0xff) {
+    Hid.SetPerKeyMods(0);
+    Hid.ClearFromReport(keycode & 0xff);
+    Hid.GenerateReport();
+  }
 }
 
 void UpdatePipe(uint8_t pipe, uint32_t new_state) {
