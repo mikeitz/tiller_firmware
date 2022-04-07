@@ -140,7 +140,7 @@ public:
     }
   }
 private:
-  inline bool IsMod(uint32_t keycode) {
+  inline const bool IsMod(uint32_t keycode) {
     return keycode >= 0xE0 && keycode < 0xF0;
   }
   static const uint32_t report_buffer_size_ = 256;
