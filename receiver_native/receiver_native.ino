@@ -301,7 +301,7 @@ void UnregisterKey(uint32_t keycode) {
 void UpdatePipe(uint8_t pipe, uint32_t new_state) {
   static uint32_t pipe_state[num_pipes] = { 0 };
   static uint32_t release_keymap[num_pipes][num_keys_per_pipe] = { 0 };
-  int32_t old_state = pipe_state[pipe];
+  uint32_t old_state = pipe_state[pipe];
   if (old_state == new_state) {
     return;
   } else {
@@ -331,13 +331,10 @@ void setup() {
 
 void loop() {
   delay(1);
-
   if (Radio.HasMessage() && TinyUSBDevice.suspended()) {
     TinyUSBDevice.remoteWakeup();
   }
-
   Hid.SendReports();
-
   static uint8_t pipe, length;
   static uint8_t data[256];
   while (Radio.DequeueMessage(&pipe, &length, data)) {
