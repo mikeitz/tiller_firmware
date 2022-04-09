@@ -1,5 +1,6 @@
 #include "nrf_gzll.h"
 #include <Adafruit_TinyUSB.h>
+#include <MIDI.h>
 
 const int num_pipes = 8;
 const int num_keys_per_pipe = 32;
@@ -20,6 +21,7 @@ public:
     nrf_gzll_set_base_address_1(0x05060708);
     nrf_gzll_set_tx_power(NRF_GZLL_TX_POWER_N8_DBM);
     nrf_gzll_enable();
+    delay(500); // Avoid race condition on radio startup.
   }
   void EnqueueMessage(uint8_t pipe, uint8_t length, uint8_t* data) {
     uint32_t cursor = write_count_;
@@ -76,9 +78,6 @@ public:
   void Init() {
     usb_hid.setReportCallback(NULL, ReportCallback);
     usb_hid.begin();
-    while (!TinyUSBDevice.mounted()) {
-      delay(1);
-    }
   }
   inline void SetMod(uint32_t keycode) {
     mods_ |= 1 << (keycode & 0xf);
@@ -151,6 +150,19 @@ private:
   int8_t mods_ = 0, per_key_mods_ = 0;
   uint8_t report_[6] = { 0, 0, 0, 0, 0, 0 };
 } Hid;
+
+///////////////////////////////////////// MIDI
+
+Adafruit_USBD_MIDI usb_midi;
+MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDI);
+
+class MidiManager {
+public:
+  void Init() {
+    usb_midi.setStringDescriptor("tiller");
+    MIDI.begin(MIDI_CHANNEL_OMNI);
+  }
+} Midi;
 
 ///////////////////////////////////////// LAYERS
 
@@ -325,8 +337,11 @@ void UpdatePipe(uint8_t pipe, uint32_t new_state) {
 void setup() {
   Serial.begin(9600);
   Hid.Init();
+  Midi.Init();
+  while (!TinyUSBDevice.mounted()) {
+    delay(1);
+  }
   Radio.Init();
-  delay(1000);
 }
 
 void loop() {

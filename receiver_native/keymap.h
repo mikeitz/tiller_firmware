@@ -8,10 +8,16 @@ enum Layer {
 enum CustomKeycode {
   TAB_OR_F4 = CUSTOM_KEYCODE(0),
   GUI_OR_STAB,
-  NUM_OR_TAB
+  NUM_OR_TAB,
 };
 
+#define MIDI_KEY(note) (0xff000000ul | note)
+
 uint32_t RegisterCustom(uint32_t keycode) {
+  if (keycode > MIDI_KEY(0)) {
+    MIDI.sendNoteOn(keycode & 0x7f, 127, 1);
+    return keycode;
+  }
   switch (keycode) {
   case TAB_OR_F4:
     return Layers.IsBase() && Hid.IsModSet(HID_KEY_ALT_LEFT) ?
@@ -23,11 +29,16 @@ uint32_t RegisterCustom(uint32_t keycode) {
     return Layers.IsBase() && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT)) ?
       RegisterKey(HID_KEY_TAB) : RegisterKey(MOMENTARY(LAYER_NUM));
   default:
+    Serial.println("missing keycode");
+    Serial.println(keycode, HEX);
     return keycode;
   }
 }
 
 void UnregisterCustom(uint32_t keycode) {
+  if (keycode > MIDI_KEY(0)) {
+    return MIDI.sendNoteOff(keycode & 0x7f, 0, 1);
+  }
   switch (keycode) {
   default:
     return;
@@ -88,12 +99,13 @@ const uint32_t right_map[num_layers][num_keys_per_pipe] = {
 
 const uint32_t skinny_pad[num_layers][num_keys_per_pipe] = {
   [LAYER_BASE] = {
-     HID_KEY_A, HID_KEY_B, HID_KEY_C, HID_KEY_D,
-     HID_KEY_A, HID_KEY_B, HID_KEY_C, HID_KEY_D,
-     HID_KEY_A, HID_KEY_B, HID_KEY_C, HID_KEY_D,
-     HID_KEY_W, HID_KEY_X, HID_KEY_Y, HID_KEY_Z,
-     HID_KEY_W, HID_KEY_X, HID_KEY_Y, HID_KEY_Z,
-     HID_KEY_W, HID_KEY_X, HID_KEY_Y, HID_KEY_Z,
+     MIDI_KEY(60), MIDI_KEY(61), MIDI_KEY(62), MIDI_KEY(63),
+     MIDI_KEY(68), MIDI_KEY(69), MIDI_KEY(70), MIDI_KEY(71),
+     MIDI_KEY(76), MIDI_KEY(77), MIDI_KEY(78), MIDI_KEY(79),
+
+     MIDI_KEY(64), MIDI_KEY(65), MIDI_KEY(66), MIDI_KEY(67),
+     MIDI_KEY(72), MIDI_KEY(73), MIDI_KEY(74), MIDI_KEY(75),
+     MIDI_KEY(80), MIDI_KEY(81), MIDI_KEY(82), MIDI_KEY(83),
   },
 };
 
