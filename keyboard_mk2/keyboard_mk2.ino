@@ -11,29 +11,29 @@ const uint8_t num_extra = 3;
 const uint8_t keys = num_rows * num_cols;
 
 #if MARK == 1 // Row/col based printed one-piece rechargeable board.
-  #if SIDE == 0
-    const uint8_t pipe = 1;
-    const uint8_t rows[num_rows] = {9, PIN_SERIAL1_TX, PIN_SPI_MOSI};
-    const uint8_t cols[num_cols] = {PIN_SPI_MISO, PIN_SPI_SCK, PIN_WIRE_SCL, 10, 12, 13, PIN_A4 /* DUMMY */};
-    const uint8_t extra_rows[num_extra] = {0, 1, 2};
-    const uint8_t extra_cols[num_extra] = {6, 6, 6};
-    const uint8_t extra_pins[num_extra] = {PIN_A0, PIN_A1, PIN_A2};
-    const uint8_t extra_ground = PIN_A3;
-  #else
-    const uint8_t pipe = 2;
-    const uint8_t rows[num_rows] = {PIN_SPI_SCK, 7, PIN_SERIAL1_RX};
-    const uint8_t cols[num_cols] = {PIN_A4 /* DUMMY */, PIN_A0, PIN_A1, PIN_A2, PIN_A5, PIN_SPI_MOSI, PIN_SERIAL1_TX};
-    const uint8_t extra_rows[num_extra] = {0, 1, 2};
-    const uint8_t extra_cols[num_extra] = {0, 0, 0};
-    const uint8_t extra_pins[num_extra] = {11, 12, 13};
-    const uint8_t extra_ground = 10;
-  #endif
+#if SIDE == 0
+const uint8_t pipe = 1;
+const uint8_t rows[num_rows] = { 9, PIN_SERIAL1_TX, PIN_SPI_MOSI };
+const uint8_t cols[num_cols] = { PIN_SPI_MISO, PIN_SPI_SCK, PIN_WIRE_SCL, 10, 12, 13, PIN_A4 /* DUMMY */ };
+const uint8_t extra_rows[num_extra] = { 0, 1, 2 };
+const uint8_t extra_cols[num_extra] = { 6, 6, 6 };
+const uint8_t extra_pins[num_extra] = { PIN_A0, PIN_A1, PIN_A2 };
+const uint8_t extra_ground = PIN_A3;
+#else
+const uint8_t pipe = 2;
+const uint8_t rows[num_rows] = { PIN_SPI_SCK, 7, PIN_SERIAL1_RX };
+const uint8_t cols[num_cols] = { PIN_A4 /* DUMMY */, PIN_A0, PIN_A1, PIN_A2, PIN_A5, PIN_SPI_MOSI, PIN_SERIAL1_TX };
+const uint8_t extra_rows[num_extra] = { 0, 1, 2 };
+const uint8_t extra_cols[num_extra] = { 0, 0, 0 };
+const uint8_t extra_pins[num_extra] = { 11, 12, 13 };
+const uint8_t extra_ground = 10;
+#endif
 #endif
 
 const uint8_t delay_per_tick = 2;
 const uint8_t debounce_ticks = 2;
-const uint16_t repeat_transmit_ticks = 5000/delay_per_tick;
-const uint16_t max_resends = 1000/delay_per_tick;
+const uint16_t repeat_transmit_ticks = 5000 / delay_per_tick;
+const uint16_t max_resends = 1000 / delay_per_tick;
 
 ///////////////////////////////////////////////////// MATRIX
 
@@ -92,14 +92,14 @@ void initMatrix() {
 
 void show(uint64_t x) {
   for (int i = 0; i < 64; i++) {
-    Serial.print(x & (ONE<<i) ? 1 : 0);
+    Serial.print(x & (ONE << i) ? 1 : 0);
   }
   Serial.println();
 }
 
 void show(uint32_t x) {
   for (int i = 0; i < 32; i++) {
-    Serial.print(x & (1UL<<i) ? 1 : 0);
+    Serial.print(x & (1UL << i) ? 1 : 0);
   }
   Serial.println();
 }
@@ -118,7 +118,7 @@ uint8_t scanWithDebounce() {
     ((uint32_t*)&scan)[1] = NRF_P1->IN;
     // Update rows off cycle to give pins time to settle.
     digitalWrite(rows[r], HIGH);
-    digitalWrite(rows[(r+1) % num_rows], LOW);
+    digitalWrite(rows[(r + 1) % num_rows], LOW);
     scan = ~scan;
     masked_row = scan & col_mask;
     scan_to_debounce_diff = scan_to_debounce_diff || (masked_row != debounce_rows[r]);
@@ -158,13 +158,13 @@ volatile bool force_resend = false;
 volatile uint8_t outstanding_packets = 0;
 
 void nfcAsGpio() {
-  if ((NRF_UICR->NFCPINS & UICR_NFCPINS_PROTECT_Msk) == (UICR_NFCPINS_PROTECT_NFC << UICR_NFCPINS_PROTECT_Pos)){
+  if ((NRF_UICR->NFCPINS & UICR_NFCPINS_PROTECT_Msk) == (UICR_NFCPINS_PROTECT_NFC << UICR_NFCPINS_PROTECT_Pos)) {
     NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos;
-    while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
     NRF_UICR->NFCPINS &= ~UICR_NFCPINS_PROTECT_Msk;
-    while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
     NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
-    while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
     NVIC_SystemReset();
   }
 }
@@ -205,11 +205,11 @@ void initCore() {
 uint8_t resends = 0;
 
 void initRadio() {
-  #if SIDE == 0
-    static uint8_t channel_table[3] = {25, 63, 33};
-  #else
-    static uint8_t channel_table[3] = {4, 42, 77};
-  #endif
+#if SIDE == 0
+  static uint8_t channel_table[3] = { 25, 63, 33 };
+#else
+  static uint8_t channel_table[3] = { 4, 42, 77 };
+#endif
   delay(1000);
   nrf_gzll_init(NRF_GZLL_MODE_DEVICE);
   nrf_gzll_set_max_tx_attempts(100);
