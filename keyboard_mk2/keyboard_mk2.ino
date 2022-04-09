@@ -1,16 +1,15 @@
+#include "Adafruit_TinyUSB.h"
 #include "nrf.h"
 #include "nrf_gzll.h"
 
 #define SIDE 0
-#define MARK 1
+#define MARK 2
 const uint8_t debug = 0;
 
+#if MARK == 1 // Row/col based printed one-piece rechargeable board.
 const uint8_t num_rows = 3;
 const uint8_t num_cols = 7;
 const uint8_t num_extra = 3;
-const uint8_t keys = num_rows * num_cols;
-
-#if MARK == 1 // Row/col based printed one-piece rechargeable board.
 #if SIDE == 0
 const uint8_t pipe = 1;
 const uint8_t rows[num_rows] = { 9, PIN_SERIAL1_TX, PIN_SPI_MOSI };
@@ -29,6 +28,24 @@ const uint8_t extra_pins[num_extra] = { 11, 12, 13 };
 const uint8_t extra_ground = 10;
 #endif
 #endif
+#if MARK == 2 // Long skinny macro board.
+const uint8_t num_rows = 2;
+const uint8_t num_cols = 12;
+const uint8_t num_extra = 0;
+const uint8_t pipe = 0;
+const uint8_t rows[num_rows] = { PIN_A0, PIN_SPI_MISO };
+const uint8_t cols[num_cols] = {
+  PIN_SERIAL1_RX, PIN_SERIAL1_TX, 7, 9,
+  10, 11, 12, 13,
+  PIN_A2, PIN_A3, PIN_A4, PIN_A5
+};
+const uint8_t extra_rows[num_extra] = { };
+const uint8_t extra_cols[num_extra] = { };
+const uint8_t extra_pins[num_extra] = { };
+const uint8_t extra_ground = 5;
+#endif
+
+const uint8_t keys = num_rows * num_cols;
 
 const uint8_t delay_per_tick = 2;
 const uint8_t debounce_ticks = 2;
