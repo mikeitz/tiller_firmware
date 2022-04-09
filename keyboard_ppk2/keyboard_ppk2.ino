@@ -11,28 +11,28 @@ const uint8_t num_extra = 3;
 const uint8_t num_keys = num_rows * num_cols;
 
 #if MARK == 1 // Pin-per-key first version of 3d contoured board.
-  #if SIDE == 0
-    const uint8_t pipe = 1;
-    const uint8_t keys[num_keys] = {
-      6, 5, 9, PIN_WIRE_SCL, PIN_WIRE_SDA, PIN_NFC2, PIN_A2,
-      PIN_SPI_SCK, 10, 13, 12, 11, PIN_SERIAL1_TX, PIN_A1,
-      PIN_A4, PIN_A3, PIN_A5, PIN_SPI_MOSI, PIN_SPI_MISO, PIN_SERIAL1_RX, PIN_A0
-    };
-  #else
-    const uint8_t pipe = 2;
-    const uint8_t keys[num_keys] = {
-      PIN_A0, PIN_WIRE_SDA, PIN_WIRE_SCL, PIN_NFC2, PIN_SERIAL1_RX, PIN_SPI_MOSI, PIN_SERIAL1_TX,
-      12, 6, 5, PIN_SPI_SCK, PIN_A5, PIN_SPI_MISO, PIN_A2,
-      11, 10, 9, PIN_A4, PIN_A3, 13, PIN_A1
-    };
-  #endif
+#if SIDE == 0
+const uint8_t pipe = 1;
+const uint8_t keys[num_keys] = {
+  6, 5, 9, PIN_WIRE_SCL, PIN_WIRE_SDA, PIN_NFC2, PIN_A2,
+  PIN_SPI_SCK, 10, 13, 12, 11, PIN_SERIAL1_TX, PIN_A1,
+  PIN_A4, PIN_A3, PIN_A5, PIN_SPI_MOSI, PIN_SPI_MISO, PIN_SERIAL1_RX, PIN_A0
+};
+#else
+const uint8_t pipe = 2;
+const uint8_t keys[num_keys] = {
+  PIN_A0, PIN_WIRE_SDA, PIN_WIRE_SCL, PIN_NFC2, PIN_SERIAL1_RX, PIN_SPI_MOSI, PIN_SERIAL1_TX,
+  12, 6, 5, PIN_SPI_SCK, PIN_A5, PIN_SPI_MISO, PIN_A2,
+  11, 10, 9, PIN_A4, PIN_A3, 13, PIN_A1
+};
+#endif
 #endif
 
 const uint8_t delay_per_tick = 2;
 const uint8_t debounce_ticks = 2;
-const uint16_t repeat_transmit_ticks = 5000/delay_per_tick;
-const uint16_t max_resends = 1000/delay_per_tick;
-  
+const uint16_t repeat_transmit_ticks = 5000 / delay_per_tick;
+const uint16_t max_resends = 1000 / delay_per_tick;
+
 ///////////////////////////////////////////////////// MATRIX
 
 const uint64_t ONE = 1;
@@ -68,14 +68,14 @@ void initMatrix() {
 
 void show(uint64_t x) {
   for (int i = 0; i < 64; i++) {
-    Serial.print(x & (ONE<<i) ? 1 : 0);
+    Serial.print(x & (ONE << i) ? 1 : 0);
   }
   Serial.println();
 }
 
 void show(uint32_t x) {
   for (int i = 0; i < 32; i++) {
-    Serial.print(x & (1UL<<i) ? 1 : 0);
+    Serial.print(x & (1UL << i) ? 1 : 0);
   }
   Serial.println();
 }
@@ -91,7 +91,7 @@ uint8_t scanWithDebounce() {
 
   ((uint32_t*)&scan)[0] = NRF_P0->IN;
   ((uint32_t*)&scan)[1] = NRF_P1->IN;
-  
+
   scan = ~scan;
   uint64_t masked = scan & key_mask;
   scan_to_debounce_diff = masked != debounce;
@@ -121,13 +121,13 @@ volatile bool force_resend = false;
 volatile uint8_t outstanding_packets = 0;
 
 void nfcAsGpio() {
-  if ((NRF_UICR->NFCPINS & UICR_NFCPINS_PROTECT_Msk) == (UICR_NFCPINS_PROTECT_NFC << UICR_NFCPINS_PROTECT_Pos)){
+  if ((NRF_UICR->NFCPINS & UICR_NFCPINS_PROTECT_Msk) == (UICR_NFCPINS_PROTECT_NFC << UICR_NFCPINS_PROTECT_Pos)) {
     NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen << NVMC_CONFIG_WEN_Pos;
-    while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
     NRF_UICR->NFCPINS &= ~UICR_NFCPINS_PROTECT_Msk;
-    while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
     NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren << NVMC_CONFIG_WEN_Pos;
-    while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+    while (NRF_NVMC->READY == NVMC_READY_READY_Busy) {}
     NVIC_SystemReset();
   }
 }
@@ -160,11 +160,11 @@ void initCore() {
 uint8_t resends = 0;
 
 void initRadio() {
-  #if SIDE == 0
-    static uint8_t channel_table[3] = {25, 63, 33};
-  #else
-    static uint8_t channel_table[3] = {4, 42, 77};
-  #endif
+#if SIDE == 0
+  static uint8_t channel_table[3] = { 25, 63, 33 };
+#else
+  static uint8_t channel_table[3] = { 4, 42, 77 };
+#endif
   delay(1000);
   nrf_gzll_init(NRF_GZLL_MODE_DEVICE);
   nrf_gzll_set_max_tx_attempts(100);
