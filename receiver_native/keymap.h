@@ -86,8 +86,19 @@ const uint32_t right_map[num_layers][num_keys_per_pipe] = {
   },
 };
 
+const uint32_t skinny_pad[num_layers][num_keys_per_pipe] = {
+  [LAYER_BASE] = {
+     HID_KEY_A, HID_KEY_B, HID_KEY_C, HID_KEY_D,
+     HID_KEY_A, HID_KEY_B, HID_KEY_C, HID_KEY_D,
+     HID_KEY_A, HID_KEY_B, HID_KEY_C, HID_KEY_D,
+     HID_KEY_W, HID_KEY_X, HID_KEY_Y, HID_KEY_Z,
+     HID_KEY_W, HID_KEY_X, HID_KEY_Y, HID_KEY_Z,
+     HID_KEY_W, HID_KEY_X, HID_KEY_Y, HID_KEY_Z,
+  },
+};
+
 const uint32_t(*keymap[num_pipes])[num_keys_per_pipe] = {
-  empty_map,
+  skinny_pad,
   left_map,
   right_map,
   empty_map,
