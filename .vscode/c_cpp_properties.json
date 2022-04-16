@@ -61,6 +61,7 @@
                 "C:\\Users\\mike\\Documents\\Arduino\\hardware\\adafruit\\Adafruit_nRF52_Arduino\\cores\\nRF5",
                 "C:\\Users\\mike\\Documents\\Arduino\\hardware\\adafruit\\Adafruit_nRF52_Arduino\\variants\\raytac_mdbt50q_rx",
                 "C:\\Users\\mike\\Documents\\Arduino\\hardware\\adafruit\\Adafruit_nRF52_Arduino\\libraries\\Adafruit_TinyUSB_Arduino\\src",
+                "C:\\Users\\mike\\Documents\\Arduino\\libraries\\MIDI_Library\\src",
                 "c:\\users\\mike\\appdata\\local\\arduino15\\packages\\adafruit\\tools\\arm-none-eabi-gcc\\9-2019q4\\arm-none-eabi\\include\\c++\\9.2.1",
                 "c:\\users\\mike\\appdata\\local\\arduino15\\packages\\adafruit\\tools\\arm-none-eabi-gcc\\9-2019q4\\arm-none-eabi\\include\\c++\\9.2.1\\arm-none-eabi",
                 "c:\\users\\mike\\appdata\\local\\arduino15\\packages\\adafruit\\tools\\arm-none-eabi-gcc\\9-2019q4\\arm-none-eabi\\include\\c++\\9.2.1\\backward",
