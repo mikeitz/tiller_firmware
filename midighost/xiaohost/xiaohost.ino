@@ -17,10 +17,10 @@ void setup() {
     Wire.begin();
     if (UsbH.Init()) {
         while (true) {
-          delay(500);
-          Wire.beginTransmission(0);
-          Wire.write(0xff);
-          Wire.endTransmission();
+            delay(500);
+            Wire.beginTransmission(0);
+            Wire.write(0xff);
+            Wire.endTransmission();
         }
     }
 }
@@ -28,19 +28,23 @@ void setup() {
 
 int n = 0;
 
+int status = 0;
+
 void loop() {
     delay(1);
     if (n++ == 3000) {
-      n = 0;
-      Wire.beginTransmission(0);
-      Wire.write(0);
-      Wire.endTransmission();
+        n = 0;
+        Wire.beginTransmission(0);
+        Wire.write(0);
+        Wire.endTransmission();
     }
-       
+
     UsbH.Task();
     if (!MIDIUSBH) {
-      return;
+        status = 0;
+        return;
     }
+    status = 1;
 
     uint8_t recvBuf[256];
     uint8_t rcode = 0;     //return code
