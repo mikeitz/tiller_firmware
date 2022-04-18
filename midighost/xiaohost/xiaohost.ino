@@ -7,6 +7,8 @@
 USBHost UsbH;
 USBH_MIDI MIDIUSBH(&UsbH);
 
+#define HEARTBEAT 5000
+
 void SendMidi(uint8_t* data, uint8_t count) {
     Wire.beginTransmission(0);
     Wire.write(data, count);
@@ -17,9 +19,9 @@ void setup() {
     Wire.begin();
     if (UsbH.Init()) {
         while (true) {
-            delay(500);
+            delay(HEARTBEAT);
             Wire.beginTransmission(0);
-            Wire.write(0xff);
+            Wire.write(0x7f); // Critical error.
             Wire.endTransmission();
         }
     }
@@ -32,19 +34,26 @@ int status = 0;
 
 void loop() {
     delay(1);
-    if (n++ == 3000) {
+    if (n > HEARTBEAT) {
         n = 0;
         Wire.beginTransmission(0);
-        Wire.write(0);
+        Wire.write(status & 0x7f); // 0 = no connection, 1 = connected.
         Wire.endTransmission();
     }
 
     UsbH.Task();
     if (!MIDIUSBH) {
+        if (status) {
+            n = HEARTBEAT;
+        }
         status = 0;
         return;
+    } else {
+        if (!status) {
+            n = HEARTBEAT;
+        }
+        status = 1;
     }
-    status = 1;
 
     uint8_t recvBuf[256];
     uint8_t rcode = 0;     //return code
@@ -64,38 +73,29 @@ void loop() {
         uint8_t header = *p & 0x0F;
         p++;
         switch (header) {
-        case 0x00:  // Misc. Reserved for future extensions.
-            break;
-        case 0x01:  // Cable events. Reserved for future expansion.
+        case 0x05:  // Single-byte System Common Message or SysEx ends with the following single byte
+        case 0x0f:  // Single Byte, TuneRequest, Clock, Start, Continue, Stop, etc.
+            SendMidi(p, 1);
             break;
         case 0x02:  // Two-byte System Common messages
-        case 0x0C:  // Program Change
-        case 0x0D:  // Channel Pressure
+        case 0x0c:  // Program Change
+        case 0x0d:  // Channel Pressure
+        case 0x06:  // SysEx ends with the following two bytes
             SendMidi(p, 2);
             break;
         case 0x03:  // Three-byte System Common messages
         case 0x08:  // Note-off
         case 0x09:  // Note-on
-        case 0x0A:  // Poly-KeyPress
-        case 0x0B:  // Control Change
-        case 0x0E:  // PitchBend Change
-            SendMidi(p, 3);
-            break;
-
+        case 0x0a:  // Poly-KeyPress
+        case 0x0b:  // Control Change
+        case 0x0e:  // PitchBend Change
         case 0x04:  // SysEx starts or continues
-            SendMidi(p, 3);
-            break;
-        case 0x05:  // Single-byte System Common Message or SysEx ends with the following single byte
-            SendMidi(p, 1);
-            break;
-        case 0x06:  // SysEx ends with the following two bytes
-            SendMidi(p, 2);
-            break;
         case 0x07:  // SysEx ends with the following three bytes
             SendMidi(p, 3);
             break;
-        case 0x0F:  // Single Byte, TuneRequest, Clock, Start, Continue, Stop, etc.
-            SendMidi(p, 1);
+        case 0x00:  // Misc. Reserved for future extensions.
+        case 0x01:  // Cable events. Reserved for future expansion.
+        default:
             break;
         }
         p += 3;

@@ -347,13 +347,16 @@ void setup() {
   Radio.Init();
 }
 
-void HandleMidi(uint8_t pipe, uint32_t msg) {
-  MIDI.send(
-    (midi::MidiType)((msg >> 16) & 0xf0), // Midi command
-    (uint8_t)((msg >> 8) & 0xff),  // Byte 1
-    (uint8_t)(msg & 0xff),         // Byte 2
-    (uint8_t)((msg >> 16) & 0x0f) + 1  // Channel
-  );
+void HandleMidi(uint8_t pipe, uint8_t* msg, uint8_t bytes) {
+  for (int i = 0; i + 2 < bytes; i += 3) {
+    MIDI.send(
+      (midi::MidiType)(msg[i] & 0xf0), // Midi command
+      msg[i + 1],
+      msg[i + 2],
+      (msg[i] & 0x0f) + 1  // Channel
+    );
+  }
+
 }
 
 void loop() {
@@ -369,12 +372,7 @@ void loop() {
       UpdatePipe(pipe, *(uint32_t*)data);
     }
     if (pipe > 5) {
-      for (int i = 0; i < length; i += 4) {
-        uint32_t msg = *(uint32_t*)data;
-        if ((msg & 0xf0000000) == 0x80000000) {
-          HandleMidi(pipe, msg & 0x00ffffff);
-        }
-      }
+      HandleMidi(pipe, data, length);
     }
 #if DEBUG
     Serial.print(pipe);

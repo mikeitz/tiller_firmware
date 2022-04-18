@@ -15,7 +15,7 @@ public:
         min_val_(min_val* SMOOTHING),
         max_val_(max_val* SMOOTHING),
         range_(max_val_ - min_val_) {}
-    void Update(uint32_t data[], uint8_t* n) {
+    void Update(uint8_t* msg, uint8_t& n) {
         sense_ -= smooth_buffer_[smooth_offset_];
         sense_ += smooth_buffer_[smooth_offset_++] = analogRead(pin_);
         if (smooth_offset_ >= SMOOTHING) {
@@ -38,17 +38,11 @@ public:
         last_sense_ = sense_;
         last_cc_ = cc;
 
-        uint32_t msg =
-            (0x80B00000) // Raw midi (byte 1), CC (byte 2).
-            | (cc_num_ << 8)
-            | cc;
-
-        data[*n] = msg;
-        *n += 1;
+        msg[n++] = 0xb0;
+        msg[n++] = cc_num_;
+        msg[n++] = cc;
 
 #if DEBUG
-        Serial.print(msg, HEX);
-        Serial.print(" ");
         Serial.print(cc_num_);
         Serial.print(" ");
         Serial.println(sense_);
@@ -111,15 +105,19 @@ void setup() {
 }
 
 void loop() {
-    uint8_t num = 0;
+    uint8_t n = 0;
+    static uint8_t msg[256];
+
     digitalWrite(PIN_VCC_ON, 1);
     delay(1);
-    left.Update(data, &num);
-    middle.Update(data, &num);
-    right.Update(data, &num);
+    left.Update(msg, n);
+    middle.Update(msg, n);
+    right.Update(msg, n);
     digitalWrite(PIN_VCC_ON, 0);
-    if (num) {
-        nrf_gzll_add_packet_to_tx_fifo(PIPE, (uint8_t*)data, num * 4);
+    if (n) {
+        nrf_gzll_add_packet_to_tx_fifo(PIPE, msg, n);
+        Serial.println(n);
     }
+
     delay(5);
 }
