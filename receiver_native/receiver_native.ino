@@ -338,7 +338,9 @@ void UpdatePipe(uint8_t pipe, uint32_t new_state) {
 ///////////////////////////////////////// MAIN
 
 void setup() {
+#if DEBUG
   Serial.begin(9600);
+#endif
   Hid.Init();
   Midi.Init();
   while (!TinyUSBDevice.mounted()) {
@@ -348,7 +350,10 @@ void setup() {
 }
 
 void HandleMidi(uint8_t pipe, uint8_t* msg, uint8_t bytes) {
-  for (int i = 0; i + 2 < bytes; i += 3) {
+  if (bytes % 3 != 0) {
+    return;
+  }
+  for (int i = 0; i < bytes; i += 3) {
     MIDI.send(
       (midi::MidiType)(msg[i] & 0xf0), // Midi command
       msg[i + 1],
@@ -356,7 +361,34 @@ void HandleMidi(uint8_t pipe, uint8_t* msg, uint8_t bytes) {
       (msg[i] & 0x0f) + 1  // Channel
     );
   }
+}
 
+static inline uint8_t TimeToVelocity(int32_t t) {
+  const int VMIN = 3000;
+  const int VMAX = 50000;
+  t *= 100; // t is 0.1 ms, convert to us.
+  t = (t - VMIN) * 127 / VMAX;
+  t = 127 - t;
+  if (t < 1) return 1;
+  if (t > 127) return 127;
+  return t;
+}
+
+void HandleCustomMidiKeys(uint8_t* data, uint8_t length) {
+  if (length % 4 != 0) {
+    return;
+  }
+  for (int i = 0; i < length; i += 4) {
+    uint8_t channel = 1;
+    uint8_t note = data[2] & 0x7f;
+    uint8_t vel = TimeToVelocity(data[0] | (((uint32_t)data[1]) << 8));
+    if (data[3] & 0x10) {
+      MIDI.sendNoteOn(note, vel, channel);
+    }
+    if (data[3] & 0x20) {
+      MIDI.sendNoteOff(note, vel, channel);
+    }
+  }
 }
 
 void loop() {
@@ -371,8 +403,11 @@ void loop() {
     if (pipe < 5 && length == 4) {
       UpdatePipe(pipe, *(uint32_t*)data);
     }
-    if (pipe > 5) {
+    if (pipe == 5 || pipe == 6) {
       HandleMidi(pipe, data, length);
+    }
+    if (pipe == 7) {
+      HandleCustomMidiKeys(data, length);
     }
 #if DEBUG
     Serial.print(pipe);

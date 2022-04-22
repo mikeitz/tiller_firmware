@@ -2,7 +2,7 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
 
-#define PIPE 7
+#define PIPE 5
 #define DEBUG 0
 
 #include <Adafruit_DotStar.h>

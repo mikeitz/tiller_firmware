@@ -116,7 +116,6 @@ void loop() {
     digitalWrite(PIN_VCC_ON, 0);
     if (n) {
         nrf_gzll_add_packet_to_tx_fifo(PIPE, msg, n);
-        Serial.println(n);
     }
 
     delay(5);
