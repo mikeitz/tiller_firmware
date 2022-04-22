@@ -1,5 +1,0 @@
-{
-    "sketch": "receiver_native\\receiver_native.ino",
-    "configuration": "softdevice=s140v6,debug=l0,debug_output=serial",
-    "board": "adafruit:Adafruit_nRF52_Arduino:mdbt50qrx"
-}
