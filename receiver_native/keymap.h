@@ -2,6 +2,7 @@ enum Layer {
   LAYER_GAME = 1,
   LAYER_SYM,
   LAYER_NUM,
+  LAYER_MIDI,
   LAYER_FN,
 };
 
@@ -62,10 +63,11 @@ const uint32_t left_map[num_layers][num_keys_per_pipe] = {
     ___, SHIFT(HID_KEY_7), SHIFT(HID_KEY_BACKSLASH), UNSHIFT(HID_KEY_BRACKET_LEFT), UNSHIFT(HID_KEY_BRACKET_RIGHT), UNSHIFT(HID_KEY_GRAVE), ___,
   },
   [LAYER_NUM] = {
-    HID_KEY_ESCAPE, HID_KEY_MINUS, HID_KEY_7, HID_KEY_8, HID_KEY_9, SHIFT(HID_KEY_5), ___,
+    HID_KEY_ESCAPE, UNSHIFT(HID_KEY_MINUS), HID_KEY_7, HID_KEY_8, HID_KEY_9, SHIFT(HID_KEY_5), ___,
     ___, HID_KEY_0, HID_KEY_4, HID_KEY_5, HID_KEY_6, SHIFT(HID_KEY_4), ___,
-    ___, HID_KEY_PERIOD, HID_KEY_1, HID_KEY_2, HID_KEY_3, HID_KEY_SPACE, ___,
+    ___, UNSHIFT(HID_KEY_PERIOD), HID_KEY_1, HID_KEY_2, HID_KEY_3, HID_KEY_SPACE, ___,
   },
+  [LAYER_MIDI] = {},
   [LAYER_FN] = {
     ___, XXX, XXX, XXX, XXX, XXX, ___,
     ___, XXX, XXX, XXX, XXX, XXX, ___,
@@ -90,10 +92,11 @@ const uint32_t right_map[num_layers][num_keys_per_pipe] = {
     ___, HID_KEY_PAGE_DOWN, HID_KEY_F4, HID_KEY_F5, HID_KEY_F6, HID_KEY_F10, ___,
     ___, HID_KEY_INSERT, HID_KEY_F1, HID_KEY_F2, HID_KEY_F3, HID_KEY_F12, ___,
   },
+  [LAYER_MIDI] = {},
   [LAYER_FN] = {
     ___, XXX, XXX, TOGGLE(LAYER_GAME), XXX, XXX, ___,
     ___, XXX, XXX, XXX, XXX, XXX, ___,
-    ___, XXX, XXX, XXX, XXX, XXX, ___,
+    ___, HID_KEY_NUM_LOCK, TOGGLE(LAYER_MIDI), XXX, XXX, XXX, ___,
   },
 };
 
@@ -109,11 +112,29 @@ const uint32_t skinny_pad[num_layers][num_keys_per_pipe] = {
   },
 };
 
+const uint32_t num_pad[num_layers][num_keys_per_pipe] = {
+  [LAYER_BASE] = {
+     HID_KEY_KEYPAD_7, HID_KEY_KEYPAD_8, HID_KEY_KEYPAD_9, HID_KEY_KEYPAD_SUBTRACT,
+     HID_KEY_KEYPAD_4, HID_KEY_KEYPAD_5, HID_KEY_KEYPAD_6, HID_KEY_KEYPAD_ADD,
+     HID_KEY_KEYPAD_1, HID_KEY_KEYPAD_2, HID_KEY_KEYPAD_3, HID_KEY_KEYPAD_MULTIPLY,
+     HID_KEY_KEYPAD_DECIMAL, HID_KEY_KEYPAD_0, HID_KEY_KEYPAD_DIVIDE, HID_KEY_KEYPAD_ENTER,
+  },
+  [LAYER_GAME] = {0},
+  [LAYER_SYM] = {0},
+  [LAYER_NUM] = {0},
+  [LAYER_MIDI] = {
+     SET_CHANNEL_1, SET_CHANNEL_2, SET_CHANNEL_3, SET_CHANNEL_4,
+     SET_CHANNEL_5, SET_CHANNEL_6, SET_CHANNEL_7, SET_CHANNEL_8,
+     SET_CHANNEL_9, SET_CHANNEL_10, SET_CHANNEL_11, SET_CHANNEL_12,
+     SET_CHANNEL_13, SET_CHANNEL_14, SET_CHANNEL_15, SET_CHANNEL_16,
+  },
+};
+
 const uint32_t(*keymap[num_pipes])[num_keys_per_pipe] = {
   skinny_pad,
   left_map,
   right_map,
-  empty_map,
+  num_pad,
   empty_map,
   empty_map,
   empty_map,
