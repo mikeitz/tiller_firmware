@@ -1,16 +1,13 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
+#include "Adafruit_TinyUSB.h"
 
 #define SIDE 1
-#define MARK 1
+#define MARK 2
 const uint8_t debug = 0;
 
-const uint8_t num_rows = 3;
-const uint8_t num_cols = 7;
-const uint8_t num_extra = 3;
-const uint8_t num_keys = num_rows * num_cols;
-
 #if MARK == 1 // Pin-per-key first version of 3d contoured board.
+const uint8_t num_keys = 21;
 #if SIDE == 0
 const uint8_t pipe = 1;
 const uint8_t keys[num_keys] = {
@@ -26,6 +23,17 @@ const uint8_t keys[num_keys] = {
   11, 10, 9, PIN_A4, PIN_A3, 13, PIN_A1
 };
 #endif
+#endif
+
+#if MARK == 2 // Pin-per-key 4x4 numpad.
+const uint8_t num_keys = 16;
+const uint8_t pipe = 3;
+const uint8_t keys[num_keys] = {
+  PIN_017, PIN_002, PIN_115, PIN_029,
+  PIN_020, PIN_111, PIN_113, PIN_031,
+  PIN_022, PIN_011, PIN_106, PIN_010,
+  PIN_024, PIN_100, PIN_104, PIN_009,
+};
 #endif
 
 const uint8_t delay_per_tick = 2;
@@ -182,6 +190,7 @@ void transmit() {
   outstanding_packets++;
   uint32_t state = getState();
   if (!nrf_gzll_add_packet_to_tx_fifo(pipe, (uint8_t*)&state, 4)) {
+    force_resend = true;
     outstanding_packets--;
   }
 }
@@ -196,11 +205,11 @@ void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info
   outstanding_packets--;
 }
 void nrf_gzll_device_tx_failed(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
+  outstanding_packets--;
   if (outstanding_packets == 0 && resends < max_resends) {
     resends++;
     force_resend = true;
   }
-  outstanding_packets--;
 }
 void nrf_gzll_disabled() {
   outstanding_packets = 0;
