@@ -21,13 +21,13 @@ uint32_t RegisterCustom(uint32_t keycode) {
   }
   switch (keycode) {
   case TAB_OR_F4:
-    return Layers.IsBase() && Hid.IsModSet(HID_KEY_ALT_LEFT) ?
+    return Hid.IsModSet(HID_KEY_ALT_LEFT) ?
       RegisterKey(HID_KEY_F4) : RegisterKey(HID_KEY_TAB);
   case GUI_OR_STAB:
-    return Layers.IsBase() && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT)) ?
+    return Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT) ?
       RegisterKey(SHIFT(HID_KEY_TAB)) : RegisterKey(HID_KEY_GUI_LEFT);
   case NUM_OR_TAB:
-    return Layers.IsBase() && (Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT)) ?
+    return Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT) ?
       RegisterKey(HID_KEY_TAB) : RegisterKey(MOMENTARY(LAYER_NUM));
   default:
     Serial.println("missing keycode");
@@ -114,19 +114,19 @@ const uint32_t skinny_pad[num_layers][num_keys_per_pipe] = {
 
 const uint32_t num_pad[num_layers][num_keys_per_pipe] = {
   [LAYER_BASE] = {
-     HID_KEY_KEYPAD_7, HID_KEY_KEYPAD_8, HID_KEY_KEYPAD_9, HID_KEY_KEYPAD_SUBTRACT,
-     HID_KEY_KEYPAD_4, HID_KEY_KEYPAD_5, HID_KEY_KEYPAD_6, HID_KEY_KEYPAD_ADD,
-     HID_KEY_KEYPAD_1, HID_KEY_KEYPAD_2, HID_KEY_KEYPAD_3, HID_KEY_KEYPAD_MULTIPLY,
-     HID_KEY_KEYPAD_DECIMAL, HID_KEY_KEYPAD_0, HID_KEY_KEYPAD_DIVIDE, HID_KEY_KEYPAD_ENTER,
+     HID_KEY_KEYPAD_ADD, HID_KEY_KEYPAD_7, HID_KEY_KEYPAD_8, HID_KEY_KEYPAD_9,
+     HID_KEY_KEYPAD_SUBTRACT, HID_KEY_KEYPAD_4, HID_KEY_KEYPAD_5, HID_KEY_KEYPAD_6,
+     HID_KEY_KEYPAD_0, HID_KEY_KEYPAD_1, HID_KEY_KEYPAD_2, HID_KEY_KEYPAD_3,
+     HID_KEY_KEYPAD_DECIMAL, HID_KEY_KEYPAD_MULTIPLY, HID_KEY_KEYPAD_DIVIDE, HID_KEY_KEYPAD_ENTER,
   },
   [LAYER_GAME] = {0},
   [LAYER_SYM] = {0},
   [LAYER_NUM] = {0},
   [LAYER_MIDI] = {
-     SET_CHANNEL_1, SET_CHANNEL_2, SET_CHANNEL_3, SET_CHANNEL_4,
-     SET_CHANNEL_5, SET_CHANNEL_6, SET_CHANNEL_7, SET_CHANNEL_8,
-     SET_CHANNEL_9, SET_CHANNEL_10, SET_CHANNEL_11, SET_CHANNEL_12,
-     SET_CHANNEL_13, SET_CHANNEL_14, SET_CHANNEL_15, SET_CHANNEL_16,
+     MIDI_KEY(1), MIDI_KEY(2), MIDI_KEY(3), MIDI_KEY(4),
+     MIDI_KEY(5), MIDI_KEY(6), MIDI_KEY(7), MIDI_KEY(8),
+     MIDI_KEY(9), MIDI_KEY(10), MIDI_KEY(11), MIDI_KEY(12),
+     MIDI_KEY(13), MIDI_KEY(14), MIDI_KEY(15), MIDI_KEY(16),
   },
 };
 
