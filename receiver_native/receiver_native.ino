@@ -363,32 +363,31 @@ void HandleMidi(uint8_t pipe, uint8_t* msg, uint8_t bytes) {
   }
 }
 
-static inline uint8_t TimeToVelocity(int32_t t) {
-  const int VMIN = 3000;
-  const int VMAX = 50000;
-  t *= 100; // t is 0.1 ms, convert to us.
-  t = (t - VMIN) * 127 / VMAX;
-  t = 127 - t;
-  if (t < 1) return 1;
-  if (t > 127) return 127;
-  return t;
+uint8_t last_custom_message[32] = { 0 };
+uint8_t last_custom_length = 0;
+
+bool HasCustomKey(uint8_t* data, uint8_t length, uint8_t key) {
+  for (int i = 0; i < length; i += 2) {
+    if (data[i] == key) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void HandleCustomMidiKeys(uint8_t* data, uint8_t length) {
-  if (length % 4 != 0) {
-    return;
-  }
-  for (int i = 0; i < length; i += 4) {
-    uint8_t channel = 1;
-    uint8_t note = data[2] & 0x7f;
-    uint8_t vel = TimeToVelocity(data[0] | (((uint32_t)data[1]) << 8));
-    if (data[3] & 0x10) {
-      MIDI.sendNoteOn(note, vel, channel);
-    }
-    if (data[3] & 0x20) {
-      MIDI.sendNoteOff(note, vel, channel);
+  for (int i = 0; i < length; i += 2) {
+    if (!HasCustomKey(last_custom_message, last_custom_length, data[i])) {
+      MIDI.sendNoteOn(data[i], data[i + 1], 1);
     }
   }
+  for (int i = 0; i < last_custom_length; i += 2) {
+    if (!HasCustomKey(data, length, last_custom_message[i])) {
+      MIDI.sendNoteOff(last_custom_message[i], 0, 1);
+    }
+  }
+  memcpy(last_custom_message, data, length);
+  last_custom_length = length;
 }
 
 void loop() {
@@ -400,13 +399,13 @@ void loop() {
   static uint8_t pipe, length;
   static uint8_t data[256];
   while (Radio.DequeueMessage(&pipe, &length, data)) {
-    if (pipe < 5 && length == 4) {
+    if (pipe < 5 && length == 4) { // Keyboards.
       UpdatePipe(pipe, *(uint32_t*)data);
     }
-    if (pipe == 5 || pipe == 6) {
+    if (pipe == 6) { // 3 faders.
       HandleMidi(pipe, data, length);
     }
-    if (pipe == 7) {
+    if (pipe == 7) { // Midi keyboard.
       HandleCustomMidiKeys(data, length);
     }
 #if DEBUG
