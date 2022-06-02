@@ -10,6 +10,29 @@ enum CustomKeycode {
   TAB_OR_F4 = CUSTOM_KEYCODE(0),
   GUI_OR_STAB,
   NUM_OR_TAB,
+
+  OCTAVE_MINUS_2,
+  OCTAVE_MINUS_1,
+  OCTAVE_0,
+  OCTAVE_PLUS_1,
+  OCTAVE_PLUS_2,
+
+  CHANNEL_1,
+  CHANNEL_2,
+  CHANNEL_3,
+  CHANNEL_4,
+  CHANNEL_5,
+  CHANNEL_6,
+  CHANNEL_7,
+  CHANNEL_8,
+  CHANNEL_9,
+  CHANNEL_10,
+  CHANNEL_11,
+  CHANNEL_12,
+  CHANNEL_13,
+  CHANNEL_14,
+  CHANNEL_15,
+  CHANNEL_16,
 };
 
 #define MIDI_KEY(note) (0xff000000ul | note)
@@ -29,6 +52,13 @@ uint32_t RegisterCustom(uint32_t keycode) {
   case NUM_OR_TAB:
     return Hid.IsModSet(HID_KEY_ALT_LEFT) || Hid.IsModSet(HID_KEY_CONTROL_LEFT) ?
       RegisterKey(HID_KEY_TAB) : RegisterKey(MOMENTARY(LAYER_NUM));
+  case CHANNEL_1 ... CHANNEL_16:
+    MidiKeys.SetChannel(keycode - CHANNEL_1 + 1);
+    MidiKeys.SendProgramChange(keycode - CHANNEL_1 + 1, 1);  // For use in Cubase generic remote.
+    return keycode;
+  case OCTAVE_MINUS_2 ... OCTAVE_PLUS_2:
+    MidiKeys.SetTranspose(12 * (keycode - OCTAVE_0));
+    return keycode;
   default:
     Serial.println("missing keycode");
     Serial.println(keycode, HEX);
@@ -95,7 +125,7 @@ const uint32_t right_map[num_layers][num_keys_per_pipe] = {
   [LAYER_MIDI] = {},
   [LAYER_FN] = {
     ___, XXX, XXX, TOGGLE(LAYER_GAME), XXX, XXX, ___,
-    ___, XXX, XXX, XXX, XXX, XXX, ___,
+    ___, OCTAVE_MINUS_2, OCTAVE_MINUS_1, OCTAVE_0, OCTAVE_PLUS_1, OCTAVE_PLUS_2, ___,
     ___, HID_KEY_NUM_LOCK, TOGGLE(LAYER_MIDI), XXX, XXX, XXX, ___,
   },
 };
@@ -123,11 +153,15 @@ const uint32_t num_pad[num_layers][num_keys_per_pipe] = {
   [LAYER_SYM] = {0},
   [LAYER_NUM] = {0},
   [LAYER_MIDI] = {
-     MIDI_KEY(1), MIDI_KEY(2), MIDI_KEY(3), MIDI_KEY(4),
-     MIDI_KEY(5), MIDI_KEY(6), MIDI_KEY(7), MIDI_KEY(8),
-     MIDI_KEY(9), MIDI_KEY(10), MIDI_KEY(11), MIDI_KEY(12),
-     MIDI_KEY(13), MIDI_KEY(14), MIDI_KEY(15), MIDI_KEY(16),
-  },
+    CHANNEL_1, CHANNEL_2, CHANNEL_3, CHANNEL_4,
+    CHANNEL_5, CHANNEL_6, CHANNEL_7, CHANNEL_8,
+    CHANNEL_9, CHANNEL_10, CHANNEL_11, CHANNEL_12,
+    CHANNEL_13, CHANNEL_14, CHANNEL_15, CHANNEL_16,
+    /*MIDI_KEY(1), MIDI_KEY(2), MIDI_KEY(3), MIDI_KEY(4),
+    MIDI_KEY(5), MIDI_KEY(6), MIDI_KEY(7), MIDI_KEY(8),
+    MIDI_KEY(9), MIDI_KEY(10), MIDI_KEY(11), MIDI_KEY(12),
+    MIDI_KEY(13), MIDI_KEY(14), MIDI_KEY(15), MIDI_KEY(16),*/
+ },
 };
 
 const uint32_t(*keymap[num_pipes])[num_keys_per_pipe] = {

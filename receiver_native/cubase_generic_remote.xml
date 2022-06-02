@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<remotedescription version="1.1">
+<ctrltable name="Standard MIDI">
+<ctrl><name>ch1</name><stat>7</stat><chan>0</chan><addr>1</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch2</name><stat>7</stat><chan>0</chan><addr>2</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch3</name><stat>7</stat><chan>0</chan><addr>3</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch4</name><stat>7</stat><chan>0</chan><addr>4</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch5</name><stat>7</stat><chan>0</chan><addr>5</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch6</name><stat>7</stat><chan>0</chan><addr>6</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch7</name><stat>7</stat><chan>0</chan><addr>7</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch8</name><stat>7</stat><chan>0</chan><addr>8</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch9</name><stat>7</stat><chan>0</chan><addr>9</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch10</name><stat>7</stat><chan>0</chan><addr>10</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch11</name><stat>7</stat><chan>0</chan><addr>11</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch12</name><stat>7</stat><chan>0</chan><addr>12</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch13</name><stat>7</stat><chan>0</chan><addr>13</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch14</name><stat>7</stat><chan>0</chan><addr>14</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch15</name><stat>7</stat><chan>0</chan><addr>15</addr><max>127</max><flags>1</flags></ctrl>
+<ctrl><name>ch16</name><stat>7</stat><chan>0</chan><addr>16</addr><max>127</max><flags>1</flags></ctrl>
+</ctrltable>
+<bank name="Page1">
+<entry ctrl="ch1">
+<command><category>Process Logical Preset</category><action>selected to ch1</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch2">
+<command><category>Process Logical Preset</category><action>selected to ch2</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch3">
+<command><category>Process Logical Preset</category><action>selected to ch3</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch4">
+<command><category>Process Logical Preset</category><action>selected to ch4</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch5">
+<command><category>Process Logical Preset</category><action>selected to ch5</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch6">
+<command><category>Process Logical Preset</category><action>selected to ch6</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch7">
+<command><category>Process Logical Preset</category><action>selected to ch7</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch8">
+<command><category>Process Logical Preset</category><action>selected to ch8</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch9">
+<command><category>Process Logical Preset</category><action>selected to ch9</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch10">
+<command><category>Process Logical Preset</category><action>selected to ch10</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch11">
+<command><category>Process Logical Preset</category><action>selected to ch11</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch12">
+<command><category>Process Logical Preset</category><action>selected to ch12</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch13">
+<command><category>Process Logical Preset</category><action>selected to ch13</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch14">
+<command><category>Process Logical Preset</category><action>selected to ch14</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch15">
+<command><category>Process Logical Preset</category><action>selected to ch15</action><flags>1</flags></command>
+</entry>
+<entry ctrl="ch16">
+<command><category>Process Logical Preset</category><action>selected to ch16</action><flags>1</flags></command>
+</entry>
+</bank>
+</remotedescription>

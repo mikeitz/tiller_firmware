@@ -4,6 +4,9 @@
 
 #define DEBUG 0
 
+#define BIT64(n) (((uint64_t)1)<<n)
+#define BIT32(n) (((uint32_t)1)<<n)
+
 const int num_pipes = 8;
 const int num_keys_per_pipe = 32;
 const int num_layers = 16;
@@ -159,6 +162,7 @@ private:
 Adafruit_USBD_MIDI usb_midi;
 MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDI);
 
+// Represents the whole stateless midi system.
 class MidiManager {
 public:
   void Init() {
@@ -166,6 +170,119 @@ public:
     MIDI.begin(MIDI_CHANNEL_OMNI);
   }
 } Midi;
+
+// Represents one logical piano keyboard which might be tranposed or reconfigured.
+class MidiKeysManager {
+public:
+  void SetChannel(uint8_t channel) {
+    channel_ = channel;
+  }
+
+  void SetTranspose(int8_t steps) {
+    transpose_ = steps;
+  }
+
+  void HandlePacket(uint8_t* data, uint8_t length) {
+    if (length % 4 != 0) {
+      return;
+    }
+    for (int i = 0; i < length; i += 4) {
+      uint32_t msg = *(uint32_t*)&data[i];
+      uint8_t key = (msg >> 24) & 0x7f;
+      uint32_t time = msg & 0xfffff;
+      bool is_release = msg & 0x80000000;
+
+      if (msg == 0) {
+        // Indicates "keyboard is idle, all switches up".  We can spot check
+        // to ensure we stay in sync.
+        EnsureAllKeysReleased();
+        continue;
+      } else if (key == 0 || key == 0x7f) {
+        // Reserve these two notes.  Not used on even 88 key piano.
+        continue;
+      }
+
+      if (is_release) {
+        ReleaseKey(key, TimeToVelocity(time));
+      } else {
+        PressKey(key, TimeToVelocity(time));
+      }
+    }
+  }
+
+  void SendControlChange(uint8_t control, uint8_t value, uint8_t channel) {
+    MIDI.sendControlChange(control, value, channel);
+  }
+
+  void SendProgramChange(uint8_t program, uint8_t channel) {
+    MIDI.sendProgramChange(program, channel);
+  }
+
+private:
+  uint8_t channel_ = 1;
+  int8_t transpose_ = 0;
+
+  // Describe the channels and note values that physical keys are sounding.
+  uint64_t lower_map_ = 0, upper_map_ = 0;
+  uint8_t key_channels_[128] = { 0 };
+  uint8_t key_notes_[128] = { 0 };
+
+  void SetBit(uint8_t key) {
+    if (key > 63) {
+      upper_map_ |= BIT64(key - 64);
+    } else {
+      lower_map_ |= BIT64(key);
+    }
+  }
+
+  void ClearBit(uint8_t key) {
+    if (key > 63) {
+      upper_map_ &= ~BIT64(key - 64);
+    } else {
+      lower_map_ &= ~BIT64(key);
+    }
+  }
+
+  bool IsBitSet(uint8_t key) {
+    return (key > 63) ? (upper_map_ & BIT64(key - 64)) : (lower_map_ & BIT64(key));
+  }
+
+  uint8_t TimeToVelocity(uint32_t t) {
+    // Tuning notes:
+    // https://docs.google.com/spreadsheets/d/1R55Zrt3V2YheBwDRFwp-pJO4Ciedf6vfs9Ag5xaM4PQ/edit
+    int vel = 155 * exp(t * -0.00008f);
+    if (vel < 1) return 1;
+    if (vel > 127) return 127;
+    return vel;
+  }
+
+  void PressKey(uint8_t key, uint8_t vel) {
+    SetBit(key);
+    key_notes_[key] = key + transpose_;
+    key_channels_[key] = channel_;
+    MIDI.sendNoteOn(key_notes_[key], vel, key_channels_[key]);
+  }
+
+  void ReleaseKey(uint8_t key, uint8_t vel) {
+    if (!IsBitSet(key)) {
+      // We won't have a valid channel and note number, and in theory it's not sounding anyway.
+      return;
+    }
+    ClearBit(key);
+    MIDI.sendNoteOff(key_notes_[key], vel, key_channels_[key]);
+  }
+
+  void EnsureAllKeysReleased() {
+    if (lower_map_ || upper_map_) {
+      if (DEBUG) Serial.println("releasing stuck keys");
+      for (uint8_t i = 0; i < 128; ++i) {
+        if (IsBitSet(i)) {
+          ReleaseKey(i, 0);
+        }
+      }
+    }
+  }
+} MidiKeys;
 
 ///////////////////////////////////////// LAYERS
 
@@ -363,46 +480,6 @@ void HandleMidi(uint8_t pipe, uint8_t* msg, uint8_t bytes) {
   }
 }
 
-static inline uint8_t CustomTimeToVelocity(uint32_t t) {
-  // Tuning notes:
-  // https://docs.google.com/spreadsheets/d/1R55Zrt3V2YheBwDRFwp-pJO4Ciedf6vfs9Ag5xaM4PQ/edit
-  int vel = 155 * exp(t * -0.00008f);
-  if (vel < 1) return 1;
-  if (vel > 127) return 127;
-  return vel;
-}
-
-
-void HandleCustomMidiKeyEvent(uint8_t note, uint32_t time, bool is_release) {
-  uint8_t vel = CustomTimeToVelocity(time);
-  if (is_release) {
-    MIDI.sendNoteOff(note, vel, 1);
-  } else {
-    MIDI.sendNoteOn(note, vel, 1);
-  }
-}
-
-void HandleCustomMidiKeys(uint8_t* data, uint8_t length) {
-  if (length % 4 != 0) {
-    return;
-  }
-  for (int i = 0; i < length; i += 4) {
-    uint32_t msg = *(uint32_t*)&data[i];
-    uint8_t note = (msg >> 24) & 0x7f;
-    uint32_t time = msg & 0xfffff;
-    bool is_release = msg & 0x80000000;
-
-    // Reserve these two notes.  Not used on even 88 key piano.
-    if (note == 0 || note == 0x7f) {
-      // msg == 0 indicates "keyboard is idle, all switches up"
-      // Can be used to recover sync in case that becomes an issue.
-      return;
-    }
-
-    HandleCustomMidiKeyEvent(note, time, is_release);
-  }
-}
-
 void loop() {
   delay(1);
   if (Radio.HasMessage() && TinyUSBDevice.suspended()) {
@@ -419,7 +496,7 @@ void loop() {
       HandleMidi(pipe, data, length);
     }
     if (pipe == 7) { // Midi keyboard.
-      HandleCustomMidiKeys(data, length);
+      MidiKeys.HandlePacket(data, length);
     }
 #if DEBUG
     Serial.print(pipe);
