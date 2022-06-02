@@ -1,57 +1,57 @@
 #include <Arduino.h>
 #include <Wire.h>
 
-// PHYSICAL PINS, stripe on left
-const uint8_t RIBBON[22] = {
-    // TOP ROW, 0-10
-    16, 17, 18, 19, /* cols: */ 20, 21, 22, 26, 27, 3, 2,
-    // BOTTOM ROW, 11-21
-    15, 14, 13, 12, /* cols: */ 11, 10, 9, 8, 7, 6, 5,
-};
+const bool DEBUG = false;
 
 const uint8_t NUM_ROW = 8;
 const uint8_t NUM_COL = 7;
 const uint8_t NUM_KEY = NUM_ROW * NUM_COL;
 
+// PHYSICAL PINS, stripe on left
+const uint8_t RIBBON[22] = {
+    // TOP ROW, 0-10
+    3, 5, 28, 26, 21, 9, 11, 19, 17, 12, 14,
+    // BOTTOM ROW, 11-21
+    4, 6, 27, 22, 8, 10, 20, 18, 16, 13, 15,
+};
+
 // LOGICAL PINS, stripe on left
 // TOP: ROW_0, ROW_2, ROW_4, ROW_6, COL_A6, COL_A5, COL_A4, COL_A3, COL_A2, COL_A1, COL_A0,
 // BOT: ROW_1, ROW_3, ROW_5, ROW_7, COL_B6, COL_B5, COL_B4, COL_B3, COL_B2, COL_B1, COL_B0,
-const uint8_t ROW[NUM_ROW] = { RIBBON[0], RIBBON[11], RIBBON[1], RIBBON[12], RIBBON[2], RIBBON[13], RIBBON[3], RIBBON[14] };
-const uint8_t COL_A[NUM_COL] = { RIBBON[10], RIBBON[9], RIBBON[8], RIBBON[7], RIBBON[6], RIBBON[5], RIBBON[4] };
-const uint8_t COL_B[NUM_COL] = { RIBBON[21], RIBBON[20], RIBBON[19], RIBBON[18], RIBBON[17], RIBBON[16], RIBBON[15] };
+const uint8_t ROW[NUM_ROW] = {
+    RIBBON[0], RIBBON[11], RIBBON[1], RIBBON[12], RIBBON[2], RIBBON[13], RIBBON[3], RIBBON[14] };
+const uint8_t COL_A[NUM_COL] = {
+    RIBBON[10], RIBBON[9], RIBBON[8], RIBBON[7], RIBBON[6], RIBBON[5], RIBBON[4] };
+const uint8_t COL_B[NUM_COL] = {
+    RIBBON[21], RIBBON[20], RIBBON[19], RIBBON[18], RIBBON[17], RIBBON[16], RIBBON[15] };
 
+// A columns are the early switches, B columns are the late ones.
 uint32_t lastA[NUM_ROW], lastB[NUM_ROW];
 uint64_t timeA[NUM_KEY] = { 0 }, timeB[NUM_KEY] = { 0 };
 uint32_t bitRow[NUM_ROW], bitColA[NUM_COL], bitColB[NUM_COL];
 uint32_t maskRow = 0, maskColA = 0, maskColB = 0;
-
-static inline uint8_t timeToVelocity(uint64_t t) {
-    // Tuning notes:
-    // https://docs.google.com/spreadsheets/d/1R55Zrt3V2YheBwDRFwp-pJO4Ciedf6vfs9Ag5xaM4PQ/edit
-    int vel = 150 * exp(t * -0.00005f);
-    if (vel < 1) return 1;
-    if (vel > 127) return 127;
-    return vel;
-}
 
 inline uint8_t note(uint8_t row, uint8_t col) {
     return col * 8 + row + 32;
 }
 
 void keyUp(uint8_t note, uint32_t t) {
-    /*Serial.print("UP ");
-    Serial.print(note);
-    Serial.print(" ");
-    Serial.println(t);
-    Serial.flush();*/
+    uint32_t msg = note;
+    msg |= 0x80;
+    msg <<= 24;
+    msg |= t;
+    rp2040.fifo.push(msg);
 }
 
 void keyDown(uint8_t note, uint32_t t) {
-    //Serial.print("DOWN ");
-    //Serial.print(note);
-    //Serial.print(" ");
-    Serial.println(t);
-    //Serial.flush();
+    uint32_t msg = note;
+    msg <<= 24;
+    msg |= t;
+    rp2040.fifo.push(msg);
+}
+
+void allKeysUp() {
+    rp2040.fifo.push(0);
 }
 
 void initMatrix() {
@@ -110,32 +110,64 @@ inline bool updateScan(uint64_t t, uint8_t row, uint32_t scanAll) {
         }
         lastB[row] = scanColB;
     }
-    return key_changed;
+
+    // At least one switch is down (doesn't mean note is sounding).
+    return scanColB != maskColB || scanColA != maskColA;
 }
 
-inline bool scanMatrix() {
-    bool key_changed = false;
+
+inline void scanMatrix() {
+    static bool last_had_switch_down = false;
+    bool has_switch_down = false;
     for (uint8_t row = 0; row < NUM_ROW; ++row) {
         gpio_clr_mask(bitRow[row]);
         delayMicroseconds(100);
         uint32_t scan = gpio_get_all();
         gpio_set_mask(bitRow[row]);
         uint64_t t = to_us_since_boot(get_absolute_time());
-        key_changed |= updateScan(t, row, scan);
+        has_switch_down |= updateScan(t, row, scan);
     }
-    return key_changed;
+    if (!has_switch_down && last_had_switch_down) {
+        allKeysUp();
+    }
+    last_had_switch_down = has_switch_down;
 }
 
+void setup1() {
+    initMatrix();
+}
+
+void loop1() {
+    scanMatrix();
+}
 
 void setup() {
     Serial.begin(9600);
     Wire.setSDA(0);
     Wire.setSCL(1);
+    Wire.begin();
+
     pinMode(PIN_LED, OUTPUT);
-    initMatrix();
-    digitalWrite(PIN_LED, 1);
+    digitalWrite(PIN_LED, 0);
+
+    // Pullup the I2C bus.
+    pinMode(7, OUTPUT);
+    digitalWrite(7, 1);
 }
 
 void loop() {
-    scanMatrix();
+    uint32_t msg = rp2040.fifo.pop();
+
+    if (DEBUG) Serial.println(msg, 16);
+
+    Wire.beginTransmission(0);
+    Wire.write((uint8_t*)&msg, 4);
+    uint32_t err = Wire.endTransmission();
+
+    if (err) {
+        if (DEBUG) Serial.println(err);
+        digitalWrite(PIN_LED, 1);
+    } else {
+        digitalWrite(PIN_LED, 0);
+    }
 }

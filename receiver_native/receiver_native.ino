@@ -22,7 +22,7 @@ public:
     nrf_gzll_set_timeslot_period(900);
     nrf_gzll_set_base_address_0(0x01020304);
     nrf_gzll_set_base_address_1(0x05060708);
-    nrf_gzll_set_tx_power(NRF_GZLL_TX_POWER_N8_DBM);
+    nrf_gzll_set_tx_power(NRF_GZLL_TX_POWER_4_DBM);
     nrf_gzll_enable();
     delay(500); // Avoid race condition on radio startup.
   }
@@ -363,31 +363,44 @@ void HandleMidi(uint8_t pipe, uint8_t* msg, uint8_t bytes) {
   }
 }
 
-uint8_t last_custom_message[32] = { 0 };
-uint8_t last_custom_length = 0;
+static inline uint8_t CustomTimeToVelocity(uint32_t t) {
+  // Tuning notes:
+  // https://docs.google.com/spreadsheets/d/1R55Zrt3V2YheBwDRFwp-pJO4Ciedf6vfs9Ag5xaM4PQ/edit
+  int vel = 155 * exp(t * -0.00008f);
+  if (vel < 1) return 1;
+  if (vel > 127) return 127;
+  return vel;
+}
 
-bool HasCustomKey(uint8_t* data, uint8_t length, uint8_t key) {
-  for (int i = 0; i < length; i += 2) {
-    if (data[i] == key) {
-      return true;
-    }
+
+void HandleCustomMidiKeyEvent(uint8_t note, uint32_t time, bool is_release) {
+  uint8_t vel = CustomTimeToVelocity(time);
+  if (is_release) {
+    MIDI.sendNoteOff(note, vel, 1);
+  } else {
+    MIDI.sendNoteOn(note, vel, 1);
   }
-  return false;
 }
 
 void HandleCustomMidiKeys(uint8_t* data, uint8_t length) {
-  for (int i = 0; i < length; i += 2) {
-    if (!HasCustomKey(last_custom_message, last_custom_length, data[i])) {
-      MIDI.sendNoteOn(data[i], data[i + 1], 1);
-    }
+  if (length % 4 != 0) {
+    return;
   }
-  for (int i = 0; i < last_custom_length; i += 2) {
-    if (!HasCustomKey(data, length, last_custom_message[i])) {
-      MIDI.sendNoteOff(last_custom_message[i], 0, 1);
+  for (int i = 0; i < length; i += 4) {
+    uint32_t msg = *(uint32_t*)&data[i];
+    uint8_t note = (msg >> 24) & 0x7f;
+    uint32_t time = msg & 0xfffff;
+    bool is_release = msg & 0x80000000;
+
+    // Reserve these two notes.  Not used on even 88 key piano.
+    if (note == 0 || note == 0x7f) {
+      // msg == 0 indicates "keyboard is idle, all switches up"
+      // Can be used to recover sync in case that becomes an issue.
+      return;
     }
+
+    HandleCustomMidiKeyEvent(note, time, is_release);
   }
-  memcpy(last_custom_message, data, length);
-  last_custom_length = length;
 }
 
 void loop() {

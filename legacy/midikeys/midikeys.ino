@@ -1,6 +1,18 @@
 #include "nrf.h"
 #include "nrf_gzll.h"
 
+// OLD PINS, stripe on left
+// TOP:  16, 17, 18, 19, 20, 24, 25, 28/A4, 29/A5, 30/A6, 31/A7
+// BOT:  14, 13, 12, 11, 10, 9, 8, 5/A3, 4/A2, 3/A1, 2/A0
+// OLD MAPPING:
+// const uint8_t rows[8] = { 16, 14, 17, 13, 18, 12, 19, 11 };
+// const uint8_t colsA[8] = { 31, 30, 29, 28, 25, 24, 20 };
+// const uint8_t colsB[8] = { 2, 3, 4, 5, 8, 9, 10 };
+
+// LOGICAL PINS, stripe on left
+// TOP: ROW_0, ROW_2, ROW_4, ROW_6, COL_A6, COL_A5, COL_A4, COL_A3, COL_A2, COL_A1, COL_A0,
+// BOT: ROW_1, ROW_3, ROW_5, ROW_7, COL_B6, COL_B5, COL_B4, COL_B3, COL_B2, COL_B1, COL_B0,
+
 const uint8_t PIPE = 7;
 const bool DEBUG = 0;
 
