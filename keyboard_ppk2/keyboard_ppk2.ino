@@ -182,7 +182,7 @@ void initRadio() {
   nrf_gzll_set_timeslot_period(900);
   nrf_gzll_set_base_address_0(0x01020304);
   nrf_gzll_set_base_address_1(0x05060708);
-  nrf_gzll_set_tx_power(NRF_GZLL_TX_POWER_N8_DBM);
+  nrf_gzll_set_tx_power(NRF_GZLL_TX_POWER_4_DBM);
   nrf_gzll_enable();
 }
 
