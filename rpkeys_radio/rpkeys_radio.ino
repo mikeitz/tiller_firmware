@@ -48,7 +48,7 @@ uint32_t ack_payload_length = 0;
 uint8_t channel_table[6] = { 4, 25, 42, 63, 77, 33 };
 
 void initRadio() {
-    delay(500);
+    delay(200);
     nrf_gzll_init(NRF_GZLL_MODE_DEVICE);
     nrf_gzll_set_max_tx_attempts(1000);
     nrf_gzll_set_timeslots_per_channel(4);
@@ -59,7 +59,7 @@ void initRadio() {
     nrf_gzll_set_base_address_1(0x05060708);
     nrf_gzll_set_tx_power(NRF_GZLL_TX_POWER_4_DBM);
     nrf_gzll_enable();
-    delay(500);
+    delay(300);
 }
 
 void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {
@@ -75,11 +75,10 @@ void nrf_gzll_disabled() {}
 void nrf_gzll_host_rx_data_ready(uint32_t pipe, nrf_gzll_host_rx_info_t rx_info) {}
 
 void setup() {
+    initRadio();
     if (DEBUG) Serial.begin(9600);
     Wire.begin(0);
     Wire.onReceive(Receive);
-    initRadio();
-    delay(500);
 }
 
 void loop() {

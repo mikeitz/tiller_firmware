@@ -127,10 +127,10 @@ void setup() {
 #if DEBUG
     Serial.begin(9600);
 #endif
-    Wire.begin(0);
-    Wire.onReceive(Receive);
     showColor(255, 255, 255);
     initRadio();
+    Wire.begin(0);
+    Wire.onReceive(Receive);
 }
 
 void loop() {
