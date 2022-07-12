@@ -59,7 +59,7 @@ void initRadio() {
     nrf_gzll_set_base_address_1(0x05060708);
     nrf_gzll_set_tx_power(NRF_GZLL_TX_POWER_4_DBM);
     nrf_gzll_enable();
-    delay(300);
+    delay(500);
 }
 
 void nrf_gzll_device_tx_success(uint32_t pipe, nrf_gzll_device_tx_info_t tx_info) {

@@ -134,6 +134,8 @@ inline void scanMatrix() {
 }
 
 void setup1() {
+    // Wait for radio to start up to avoid filling the queue on startup.
+    delay(4000);
     initMatrix();
 }
 
