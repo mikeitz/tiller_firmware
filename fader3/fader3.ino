@@ -63,10 +63,8 @@ private:
 
 uint8_t ack_payload[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 uint32_t ack_payload_length = 0;
-uint8_t data_buffer[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 uint8_t channel_table[3] = { 4, 42, 77 };
-
-uint32_t data[100];
+uint8_t msg[NRF_GZLL_CONST_MAX_PAYLOAD_LENGTH];
 
 void initRadio() {
     delay(500);
@@ -97,26 +95,35 @@ auto left = Controller(PIN_A3, 21, 1, 931);
 auto middle = Controller(PIN_A2, 11, 1, 931);
 auto right = Controller(PIN_A1, 1, 1, 931);
 
-void setup() {
-    pinMode(PIN_VCC_ON, OUTPUT);
-    digitalWrite(PIN_VCC_ON, 0);
-    initRadio();
-    digitalWrite(PIN_LED1, 1);
-}
-
-void loop() {
-    uint8_t n = 0;
-    static uint8_t msg[256];
-
+void poll(uint8_t* msg, uint8_t& n) {
     digitalWrite(PIN_VCC_ON, 1);
     delay(1);
     left.Update(msg, n);
     middle.Update(msg, n);
     right.Update(msg, n);
     digitalWrite(PIN_VCC_ON, 0);
+
+}
+
+void setup() {
+    pinMode(PIN_VCC_ON, OUTPUT);
+    digitalWrite(PIN_VCC_ON, 0);
+    initRadio();
+    digitalWrite(PIN_LED1, 1);
+
+    //  Warm up smoothing buffer.
+    for (uint8_t i = 0; i < SMOOTHING * 2; ++i) {
+        uint8_t n = 0;
+        poll(msg, n);
+        delay(5);
+    }
+}
+
+void loop() {
+    uint8_t n = 0;
+    poll(msg, n);
     if (n) {
         nrf_gzll_add_packet_to_tx_fifo(PIPE, msg, n);
     }
-
     delay(5);
 }
