@@ -404,6 +404,7 @@ uint32_t RegisterKey(uint32_t keycode) {
     Hid.SetPerKeyMods((keycode & 0xff00) >> 8);
     Hid.AddToReport(keycode & 0xff);
     Hid.GenerateReport();
+    Hid.ResetPerKeyMods();
   }
   return keycode;
 }
@@ -424,7 +425,6 @@ void UnregisterKey(uint32_t keycode) {
     }
   }
   if (keycode & 0xff) {
-    Hid.SetPerKeyMods(0);
     Hid.ClearFromReport(keycode & 0xff);
     Hid.GenerateReport();
   }
@@ -448,7 +448,6 @@ void UpdatePipe(uint8_t pipe, uint32_t new_state) {
       }
     }
   }
-  Hid.ResetPerKeyMods();
   pipe_state[pipe] = new_state;
 }
 
