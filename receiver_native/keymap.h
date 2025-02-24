@@ -169,8 +169,8 @@ const uint32_t(*keymap[num_pipes])[num_keys_per_pipe] = {
   left_map,
   right_map,
   num_pad,
-  empty_map,
-  empty_map,
+  left_map,
+  right_map,
   empty_map,
   empty_map,
 };

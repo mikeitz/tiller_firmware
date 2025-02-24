@@ -3,7 +3,7 @@
 #include "Adafruit_TinyUSB.h"
 
 #define SIDE 1
-#define MARK 2
+#define MARK 3
 const uint8_t debug = 0;
 
 #if MARK == 1 // Pin-per-key first version of 3d contoured board.
@@ -34,6 +34,25 @@ const uint8_t keys[num_keys] = {
   PIN_022, PIN_011, PIN_106, PIN_010,
   PIN_024, PIN_100, PIN_104, PIN_009,
 };
+#endif
+
+#if MARK == 3 // First low profile 3d contoured board.
+const uint8_t num_keys = 21;
+#if SIDE == 0
+const uint8_t pipe = 4;
+const uint8_t keys[num_keys] = {
+  PIN_002, PIN_029, PIN_031, PIN_006, PIN_017, PIN_008, PIN_106,
+  PIN_115, PIN_107, PIN_102, PIN_101, PIN_020, PIN_024, PIN_104,
+  PIN_113, PIN_111, PIN_010, PIN_009, PIN_022, PIN_100, PIN_011,
+};
+#else
+const uint8_t pipe = 5;
+const uint8_t keys[num_keys] = {
+  PIN_009, PIN_002, PIN_031, PIN_107, PIN_017, PIN_006, PIN_024,
+  PIN_010, PIN_115, PIN_029, PIN_102, PIN_020, PIN_008, PIN_100,
+  PIN_111, PIN_113, PIN_106, PIN_101, PIN_022, PIN_104, PIN_011,
+};
+#endif
 #endif
 
 const uint8_t delay_per_tick = 2;

@@ -488,7 +488,7 @@ void loop() {
   static uint8_t pipe, length;
   static uint8_t data[256];
   while (Radio.DequeueMessage(&pipe, &length, data)) {
-    if (pipe < 5 && length == 4) { // Keyboards.
+    if (pipe <= 5 && length == 4) { // Keyboards.
       UpdatePipe(pipe, *(uint32_t*)data);
     }
     if (pipe == 6) { // 3 faders.
