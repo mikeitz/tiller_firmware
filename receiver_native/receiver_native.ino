@@ -362,6 +362,7 @@ private:
 #define MOD(mod) (1 << (8 + (mod & 0xf)))
 #define SHIFT(key) (MOD(HID_KEY_SHIFT_LEFT) | key)
 #define CTRL(key) (MOD(HID_KEY_CONTROL_LEFT) | key)
+#define ALT(key) (MOD(HID_KEY_ALT_LEFT) | key)
 #define UNSHIFT(key) (MOD(HID_KEY_SHIFT_RIGHT) | key)
 
 #define MOMENTARY(layer) (layer << 16)
@@ -370,7 +371,7 @@ private:
 
 const uint32_t empty_map[num_layers][num_keys_per_pipe] = {};
 
-#include "./keymap.h"
+#include "./keymap_mac.h"
 
 uint32_t GetKeyFromMap(uint8_t pipe, uint8_t key) {
   for (int i = 0; i < Layers.GetNumActiveLayers(); ++i) {
