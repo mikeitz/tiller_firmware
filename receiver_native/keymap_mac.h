@@ -11,11 +11,12 @@ enum CustomKeycode {
   MAC_ALT,
 };
 
+// Track when the thumb keys should become (shift-)tab.
 uint8_t command_stab_mode = 0;
 uint8_t alt_stab_mode = 0;
 
 uint32_t RegisterCustom(uint32_t keycode) {
-  // Return the key to pass to unregister on keyup.
+  // Return the key that's passed to unregister on keyup.
   switch (keycode) {
   case MAC_COMMAND:
     command_stab_mode = 1;
@@ -82,9 +83,6 @@ void UnregisterCustom(uint32_t keycode) {
     return;
   }
 }
-
-// HID_KEY_CONTROL_LEFT
-// HID_KEY_ALT_LEFT
 
 const uint32_t left_map[num_layers][num_keys_per_pipe] = {
   [LAYER_BASE] = {
