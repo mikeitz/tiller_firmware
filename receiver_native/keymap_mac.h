@@ -14,20 +14,6 @@ enum CustomKeycode {
 uint8_t command_stab_mode = 0;
 uint8_t alt_stab_mode = 0;
 
-uint8_t UpdateStab() {
-  if (command_stab_mode == 1) {
-    command_stab_mode = 2;
-    UnregisterKey(HID_KEY_GUI_LEFT);
-    RegisterKey(HID_KEY_CONTROL_LEFT);
-  }
-  if (alt_stab_mode == 1) {
-    alt_stab_mode = 2;
-    UnregisterKey(HID_KEY_ALT_LEFT);
-    RegisterKey(HID_KEY_GUI_LEFT);
-  }
-  return command_stab_mode || alt_stab_mode;
-}
-
 uint32_t RegisterCustom(uint32_t keycode) {
   // Return the key to pass to unregister on keyup.
   switch (keycode) {
@@ -40,14 +26,34 @@ uint32_t RegisterCustom(uint32_t keycode) {
     RegisterKey(HID_KEY_ALT_LEFT);
     return MAC_ALT;
   case CTRL_OR_STAB:
-    if (UpdateStab()) {
-      return RegisterKey(SHIFT(HID_KEY_TAB));
+    if (command_stab_mode || alt_stab_mode) {
+      if (command_stab_mode) {
+        return RegisterKey(UNGUI(CTRL(SHIFT(HID_KEY_TAB))));
+      }
+      if (alt_stab_mode) {
+        if (alt_stab_mode == 1) {
+          alt_stab_mode = 2;
+          UnregisterKey(HID_KEY_ALT_LEFT);
+          RegisterKey(HID_KEY_GUI_LEFT);
+        }
+        return RegisterKey(SHIFT(HID_KEY_TAB));
+      }
     } else {
       return RegisterKey(HID_KEY_CONTROL_LEFT);
     }
   case NUM_OR_TAB:
-    if (UpdateStab()) {
-      return RegisterKey(HID_KEY_TAB);
+    if (command_stab_mode || alt_stab_mode) {
+      if (command_stab_mode) {
+        return RegisterKey(UNGUI(CTRL(HID_KEY_TAB)));
+      }
+      if (alt_stab_mode) {
+        if (alt_stab_mode == 1) {
+          alt_stab_mode = 2;
+          UnregisterKey(HID_KEY_ALT_LEFT);
+          RegisterKey(HID_KEY_GUI_LEFT);
+        }
+        return RegisterKey(HID_KEY_TAB);
+      }
     } else {
       return RegisterKey(MOMENTARY(LAYER_NUM));
     }
@@ -61,11 +67,7 @@ uint32_t RegisterCustom(uint32_t keycode) {
 void UnregisterCustom(uint32_t keycode) {
   switch (keycode) {
   case MAC_COMMAND:
-    if (command_stab_mode == 2) {
-      UnregisterKey(HID_KEY_CONTROL_LEFT);
-    } else {
-      UnregisterKey(HID_KEY_GUI_LEFT);
-    }
+    UnregisterKey(HID_KEY_GUI_LEFT);
     command_stab_mode = 0;
     break;
   case MAC_ALT:

@@ -363,7 +363,10 @@ private:
 #define SHIFT(key) (MOD(HID_KEY_SHIFT_LEFT) | key)
 #define CTRL(key) (MOD(HID_KEY_CONTROL_LEFT) | key)
 #define ALT(key) (MOD(HID_KEY_ALT_LEFT) | key)
+
+// Right mod key bits repurposed to be anti-per-key mods.
 #define UNSHIFT(key) (MOD(HID_KEY_SHIFT_RIGHT) | key)
+#define UNGUI(key) (MOD(HID_KEY_GUI_RIGHT) | key)
 
 #define MOMENTARY(layer) (layer << 16)
 #define TOGGLE(layer) ((0x1u << 20) | MOMENTARY(layer))
