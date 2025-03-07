@@ -4,8 +4,7 @@ enum Layer {
 };
 
 enum CustomKeycode {
-  TAB_OR_F4 = CUSTOM_KEYCODE(0),
-  CTRL_OR_STAB,
+  CTRL_OR_STAB = CUSTOM_KEYCODE(0),
   NUM_OR_TAB,
   MAC_COMMAND,
   MAC_ALT,
@@ -86,7 +85,7 @@ void UnregisterCustom(uint32_t keycode) {
 
 const uint32_t left_map[num_layers][num_keys_per_pipe] = {
   [LAYER_BASE] = {
-    TAB_OR_F4, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, CTRL_OR_STAB,
+    HID_KEY_TAB, HID_KEY_Q, HID_KEY_W, HID_KEY_E, HID_KEY_R, HID_KEY_T, CTRL_OR_STAB,
     MAC_COMMAND, HID_KEY_A, HID_KEY_S, HID_KEY_D, HID_KEY_F, HID_KEY_G, HID_KEY_SHIFT_LEFT,
     MAC_ALT, HID_KEY_Z, HID_KEY_X, HID_KEY_C, HID_KEY_V, HID_KEY_B, NUM_OR_TAB,
   },
