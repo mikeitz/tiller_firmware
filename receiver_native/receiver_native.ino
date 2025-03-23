@@ -363,6 +363,7 @@ private:
 #define SHIFT(key) (MOD(HID_KEY_SHIFT_LEFT) | key)
 #define CTRL(key) (MOD(HID_KEY_CONTROL_LEFT) | key)
 #define ALT(key) (MOD(HID_KEY_ALT_LEFT) | key)
+#define GUI(key) (MOD(HID_KEY_GUI_LEFT) | key)
 
 // Right mod key bits repurposed to be anti-per-key mods.
 #define UNSHIFT(key) (MOD(HID_KEY_SHIFT_RIGHT) | key)
