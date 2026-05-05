@@ -2,7 +2,7 @@
 #include "nrf_gzll.h"
 #include "Adafruit_TinyUSB.h"
 
-#define SIDE 1
+#define SIDE 0
 #define MARK 3
 const uint8_t debug = 0;
 
@@ -163,6 +163,13 @@ void sleep() {
   if (sleeping) return;
   sleeping = true;
   attachOneShotPortEventHandler(wake);
+  // If a key was pressed in the window before the handler was attached,
+  // it will have pulled a pin low already. Re-check and abort if so.
+  if (NRF_P0->IN != 0xFFFFFFFF || NRF_P1->IN != 0xFFFFFFFF) {
+    sleeping = false;
+    // The handler may or may not fire; wake() guards against double-wake.
+    return;
+  }
   suspendLoop();
 }
 
